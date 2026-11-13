@@ -21,7 +21,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run --project unit",
-    "test:e2e": "vitest run --project e2e --passWithNoTests"
+    "test:e2e": "vitest run --project e2e --passWithNoTests",
+    "test:ai": "vitest run --project ai"
   },
   "keywords": [
     "qa",

@@ -384,6 +384,15 @@ describe('checkErrors', () => {
     expect(severities(result)).toEqual(['minor']);
   });
 
+  it('a refused submission (POST answered with 4xx) is the server saying no, not an error', () => {
+    // ShipCheck causes these on purpose: a wrong password (401), an empty form (400/422).
+    const refused = (status: number) =>
+      ({ ...bad(status, 'fetch'), method: 'POST' }) as EvidenceEvent;
+    const result = checkErrors([refused(401), refused(400), refused(422), refused(409)]);
+    expect(result.findings).toEqual([]);
+    expect(checkErrors([refused(500)]).findings).toHaveLength(1);
+  });
+
   it('broken images and page links are left to the links check', () => {
     expect(
       checkErrors([bad(404, 'image'), bad(404, 'document'), bad(404, 'font')]).findings,

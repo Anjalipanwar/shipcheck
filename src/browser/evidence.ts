@@ -16,6 +16,8 @@ export type EvidenceEvent = {
   | { kind: 'bad-response'; url: string; method: string; resourceType: string; status: number }
   | { kind: 'insecure-request'; url: string; resourceType: string }
   | { kind: 'blocked-navigation'; url: string }
+  | { kind: 'blocked-request'; url: string; method: string; reason: string }
+  | { kind: 'write-response'; url: string; method: string; status: number }
   | { kind: 'dialog'; text: string; dialogType: string }
 );
 
@@ -91,6 +93,20 @@ export class Evidence {
     this.push(device, pageUrl, { kind: 'blocked-navigation', url });
   }
 
+  /** A request the safety backstop refused to send (payment, card number, delete…). */
+  recordBlockedRequest(
+    device: DeviceName,
+    pageUrl: string,
+    request: { url: string; method: string; reason: string },
+  ): void {
+    this.push(device, pageUrl, { kind: 'blocked-request', ...request });
+  }
+
+  /** How many events of one kind were recorded so far (to see what an action caused). */
+  count(kind: EvidenceEvent['kind']): number {
+    return this.events.filter((event) => event.kind === kind).length;
+  }
+
   /** Starts listening on every page of this browser context, including pages opened later. */
   attach(context: BrowserContext, device: DeviceName): void {
     const watch = (page: Page) => {
@@ -129,8 +145,17 @@ export class Evidence {
         }
       });
       page.on('response', (response) => {
-        if (response.status() < 400) return;
         const request = response.request();
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
+          // Answers to data-changing requests show whether a form was really accepted.
+          this.push(device, pageUrl(), {
+            kind: 'write-response',
+            url: response.url(),
+            method: request.method(),
+            status: response.status(),
+          });
+        }
+        if (response.status() < 400) return;
         this.push(device, pageUrl(), {
           kind: 'bad-response',
           url: response.url(),

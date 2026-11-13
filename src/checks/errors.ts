@@ -171,8 +171,12 @@ export function checkErrors(events: readonly EvidenceEvent[]): CheckResult {
     );
   }
 
+  // Only failed requests for data (GET) count. A refused submission (POST answered with 400,
+  // 401, 409, 422…) is the server correctly saying "no" to input — ShipCheck causes those on
+  // purpose when it tries a wrong password or an empty form.
   const clientErrors = badResponses.filter(
-    (e) => DATA_TYPES.has(e.resourceType) && e.status >= 400 && e.status < 500,
+    (e) =>
+      DATA_TYPES.has(e.resourceType) && e.status >= 400 && e.status < 500 && e.method === 'GET',
   );
   const dropped = ofKind(events, 'request-failed').filter(
     (e) =>

@@ -19,6 +19,16 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
+      {
+        // Real AI model, real key: run on purpose with "npm run test:ai" (uses the key's quota).
+        test: {
+          name: 'ai',
+          include: ['test/ai/**/*.test.ts'],
+          environment: 'node',
+          testTimeout: 600_000,
+          hookTimeout: 600_000,
+        },
+      },
     ],
   },
 });

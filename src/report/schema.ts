@@ -76,6 +76,9 @@ export const ReportSchema = z.object({
     /** True when a budget ran out or the run stopped early. */
     partial: z.boolean(),
     llmCalls: z.number().int().nonnegative(),
+    /** AI calls per flow, and the limit for the run (absent in --no-ai runs). */
+    llmCallsByFlow: z.record(z.string(), z.number().int().nonnegative()).optional(),
+    llmCallLimit: z.number().int().positive().optional(),
   }),
   verdict: VerdictSchema,
   counts: z.object({

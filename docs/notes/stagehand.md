@@ -15,3 +15,12 @@ Checked against the npm registry, the package README and the type definitions sh
 - **`agent`:** `sh.agent({ systemPrompt?, model?, mode?, tools? }).execute(instruction | { instruction, maxSteps?, page?, signal? })` → `{ success, message, actions, completed, usage? }`. We plan not to use it for flows: its clicks happen inside Stagehand where our safety guard cannot veto them. Flows will use `observe()` → guard → `act(action)`.
 - **Usage counters:** `await sh.metrics` gives token totals per act/extract/observe; `await sh.history` lists calls. We count LLM calls ourselves for the 150-call budget.
 - **zod:** peer range `^3.25.76 || ^4.2.0`; we use zod 4.
+- **Verified in M4 with a live key (2026-11-13):**
+  - `act(observedAction, { page })` works on Playwright-owned pages and makes **no** AI call (source: `takeDeterministicAction` in `handlers/actHandler.js`; measured: 0 calls).
+  - **`selfHeal` must be `false`.** With the default (`true`), a failed `act(action)` takes a new snapshot, asks the model for another element and performs the method on that new selector. Measured with `selfHeal: false`: a failing action returns `success: false` and makes 0 calls.
+  - `observe` = 1 model call (about 2 s on `gemini-3.5-flash-lite`); `extract` with a schema = 2 model calls.
+  - Counting calls: `model: { modelName, apiKey, middleware }` accepts an AI SDK `LanguageModelV2Middleware`; `wrapGenerate`/`wrapStream` see every real request (also retries). `await sh.metrics` only gives token totals.
+  - Supported action methods: `click`, `fill`, `type`, `press`, `scrollTo`, `nextChunk`, `prevChunk`, `selectOptionFromDropdown`, `hover`, `doubleClick`, `dragAndDrop`.
+  - Observed selectors are absolute XPaths such as `xpath=/html[1]/body[1]/main[1]/form[1]/input[1]`.
+  - Pass `logger: () => undefined` as well as `verbose: 0`, otherwise failed actions print to the terminal.
+- **Page scripts must be plain text.** Functions given to `page.evaluate` break under `tsx` (dev mode) when they contain named inner functions (`__name is not defined`). See `checks/collect.ts` and `browser/element.ts`.

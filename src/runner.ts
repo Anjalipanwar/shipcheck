@@ -1,3 +1,6 @@
+import { LlmBudget, type BudgetSummary } from './ai/budget.js';
+import { createStagehandDriver, freePort, type AiDriver } from './ai/driver.js';
+import type { ModelChoice } from './ai/models.js';
 import { DESKTOP } from './browser/devices.js';
 import { Evidence, type Screenshot } from './browser/evidence.js';
 import { isRiskyUrl } from './browser/guard.js';
@@ -19,6 +22,13 @@ import { checkSecrets, type SecretSource } from './checks/secrets.js';
 import { checkSeo } from './checks/seo.js';
 import type { CheckResult } from './checks/types.js';
 import type { Config } from './config.js';
+import { FLOW_LABEL, runFlow, type FlowBody } from './flows/context.js';
+import { coreFlow } from './flows/core.js';
+import { formsFlow } from './flows/forms.js';
+import { landingFlow } from './flows/landing.js';
+import { loginFlow } from './flows/login.js';
+import { signupFlow } from './flows/signup.js';
+import type { FlowDeps, FlowName, FlowResult, Observation, SharedState } from './flows/types.js';
 import { makeFinding, type Finding, type Report } from './report/schema.js';
 import { computeVerdict, countBySeverity, rankFindings } from './report/verdict.js';
 import { VERSION } from './version.js';
@@ -28,8 +38,22 @@ export interface RunHooks {
   progress?: (line: string) => void;
 }
 
+/** How the AI part of a run is set up. Not needed for --no-ai runs. */
+export interface RunOptions {
+  /** The model and key to use (from chooseModel). */
+  model?: ModelChoice;
+  /** Upper limit of AI calls for the run (SPEC §7.4: 150). */
+  maxLlmCalls?: number;
+  /** Tests only: a scripted stand-in for the AI layer (it is handed the run's call budget). */
+  aiDriver?: (budget: LlmBudget) => AiDriver;
+  /** Tests only: false switches the guard off to prove the network backstop holds on its own. */
+  guardEnabled?: boolean;
+}
+
 export interface RunResult {
   report: Report;
+  /** AI calls used, in total and per flow (absent in --no-ai runs). */
+  llm?: BudgetSummary;
   screenshots: Screenshot[];
   /** Scrubs protected values (passwords, keys) from a text. */
   redact: (text: string) => string;
@@ -73,13 +97,67 @@ function summarize(result: CheckResult): string {
  * Every check is isolated: if one fails or runs out of time it is listed under
  * "What we couldn't test" and the run carries on (SPEC §8 robustness).
  */
-export async function runShipCheck(config: Config, hooks: RunHooks = {}): Promise<RunResult> {
+const FLOWS: Record<Exclude<FlowName, 'mobile'>, FlowBody> = {
+  landing: landingFlow,
+  signup: signupFlow,
+  login: loginFlow,
+  core: coreFlow,
+  forms: formsFlow,
+};
+
+/** Until the AI judge exists (M6), a problem a flow observed becomes a finding as it stands. */
+function toFinding(observation: Observation): Finding {
+  return makeFinding({
+    rule: observation.rule,
+    title: observation.title,
+    severity: observation.severity,
+    category: observation.category,
+    flow: observation.flow,
+    device: 'desktop',
+    whatHappened:
+      observation.severity === 'info'
+        ? observation.actual
+        : `${observation.actual} What should happen: ${observation.expected}`,
+    whyItMatters: observation.whyItMatters,
+    stepsToReproduce: observation.steps,
+    evidence: {
+      screenshots: observation.screenshots,
+      logs: observation.logs,
+      url: observation.url,
+    },
+    ...(observation.fixPrompt ? { fixPrompt: observation.fixPrompt } : {}),
+    confidence: observation.confidence,
+  });
+}
+
+function flowSummary(result: FlowResult): string {
+  const issues = result.observations.filter((o) => !o.ok && o.severity !== 'info').length;
+  if (issues > 0) return `${issues} ${issues === 1 ? 'issue' : 'issues'}`;
+  if (result.status === 'completed') return result.notTested.length > 0 ? 'not tested' : '✓';
+  return result.status === 'stopped' ? 'stopped early' : 'could not finish';
+}
+
+export async function runShipCheck(
+  config: Config,
+  hooks: RunHooks = {},
+  options: RunOptions = {},
+): Promise<RunResult> {
   const startedAt = new Date();
   const deadline = startedAt.getTime() + config.maxMinutes * 60_000;
   const progress = hooks.progress ?? (() => undefined);
   const evidence = new Evidence();
   evidence.protect(config.password);
+  evidence.protect(options.model?.apiKey);
   const collector = new Collector();
+  const useAi = !config.noAi;
+  if (useAi && !options.model && !options.aiDriver) {
+    throw new Error('runShipCheck needs a model (or --no-ai)');
+  }
+  const budget = new LlmBudget({
+    deadline,
+    ...(options.maxLlmCalls !== undefined ? { maxCalls: options.maxLlmCalls } : {}),
+  });
+  const cdpPort = useAi && !options.aiDriver ? await freePort() : undefined;
 
   /** Runs one named check with a timeout, inside the global time budget. */
   const step = async (label: string, work: () => Promise<CheckResult> | CheckResult) => {
@@ -109,7 +187,9 @@ export async function runShipCheck(config: Config, hooks: RunHooks = {}): Promis
     targetUrl: config.url,
     headed: config.headed,
     evidence,
+    ...(cdpPort ? { cdpPort } : {}),
   });
+  let ai: AiDriver | undefined;
   try {
     const desktop = await session.open(DESKTOP);
     const userAgent = session.userAgentFor(DESKTOP);
@@ -229,9 +309,67 @@ export async function runShipCheck(config: Config, hooks: RunHooks = {}): Promis
       );
     }
 
+    if (useAi && landing) {
+      try {
+        ai =
+          options.aiDriver?.(budget) ??
+          (await createStagehandDriver({
+            cdpPort: cdpPort as number,
+            model: options.model as ModelChoice,
+            budget,
+          }));
+      } catch {
+        collector.partial = true;
+        collector.notTested.push(
+          'Signing up, logging in, the main feature and forms — the AI tester could not start',
+        );
+        progress('Starting the AI tester… could not start');
+      }
+    }
+    if (ai && landing) {
+      const shared: SharedState = { loggedIn: false };
+      let active = desktop;
+      for (const name of config.flows) {
+        if (name === 'login') {
+          // A fresh browser profile: logging in must be tested from a logged-out state.
+          await active.context.close().catch(() => undefined);
+          active = await session.open(DESKTOP);
+          shared.loggedIn = false;
+        }
+        const deps: FlowDeps = {
+          page: active.page,
+          device: 'desktop',
+          config,
+          ai,
+          evidence,
+          budget,
+          deadline,
+          shared,
+          homeUrl: landing.finalUrl,
+          ...(options.guardEnabled === false ? { guardEnabled: false } : {}),
+        };
+        const result = await runFlow(name, deps, FLOWS[name]);
+        for (const observation of result.observations) {
+          if (observation.ok) collector.passed.push(observation.title);
+          else {
+            const finding = toFinding(observation);
+            if (!collector.findings.some((f) => f.id === finding.id)) {
+              collector.findings.push(finding);
+            }
+          }
+        }
+        for (const line of result.notTested) {
+          if (!collector.notTested.includes(line)) collector.notTested.push(line);
+        }
+        if (result.status !== 'completed') collector.partial = true;
+        progress(`${FLOW_LABEL[name]}… ${flowSummary(result)}`);
+      }
+    }
+
     // Last, because it looks at everything that happened during the run.
     await step('Hidden errors', () => checkErrors(evidence.events));
   } finally {
+    await ai?.close();
     await session.close();
   }
 
@@ -256,7 +394,30 @@ export async function runShipCheck(config: Config, hooks: RunHooks = {}): Promis
     collector.notTested.push(
       'Signing up, logging in, the main feature, forms and the phone-sized pass — these need an AI key (this run used --no-ai)',
     );
+  } else {
+    const left = (['landing', 'signup', 'login', 'core', 'forms'] as const).filter(
+      (name) => !config.flows.includes(name),
+    );
+    if (left.length > 0) {
+      collector.notTested.push(
+        `${left.map((name) => FLOW_LABEL[name]).join(', ')} — left out with --flows`,
+      );
+    }
+    collector.notTested.push('The phone-sized pass — not part of this version yet');
   }
+  const stopped = [
+    ...new Set(
+      evidence.events.flatMap((e) =>
+        e.kind === 'blocked-request' ? [`${e.reason} (${e.method} ${e.url.split('?')[0]})`] : [],
+      ),
+    ),
+  ];
+  if (stopped.length > 0) {
+    collector.notTested.push(
+      `Stopped by design — ShipCheck’s safety net blocked ${stopped.slice(0, 5).join('; ')}`,
+    );
+  }
+  const llm = useAi ? budget.summary() : undefined;
 
   const findings = rankFindings(collector.findings);
   const report: Report = {
@@ -264,11 +425,12 @@ export async function runShipCheck(config: Config, hooks: RunHooks = {}): Promis
       url: config.url,
       startedAt: startedAt.toISOString(),
       durationMs: Date.now() - startedAt.getTime(),
-      model: null,
+      model: useAi ? (options.model?.stagehandModel ?? 'scripted') : null,
       shipcheckVersion: VERSION,
-      mode: 'no-ai',
+      mode: useAi ? 'full' : 'no-ai',
       partial: collector.partial,
-      llmCalls: 0,
+      llmCalls: llm?.total ?? 0,
+      ...(llm ? { llmCallsByFlow: llm.byFlow, llmCallLimit: llm.max } : {}),
     },
     verdict: computeVerdict(findings),
     counts: countBySeverity(findings),
@@ -277,7 +439,12 @@ export async function runShipCheck(config: Config, hooks: RunHooks = {}): Promis
     notTested: collector.notTested,
     actionLog: evidence.actionLog,
   };
-  return { report, screenshots: evidence.screenshots, redact: (text) => evidence.redact(text) };
+  return {
+    report,
+    screenshots: evidence.screenshots,
+    redact: (text) => evidence.redact(text),
+    ...(llm ? { llm } : {}),
+  };
 }
 
 interface Landing {

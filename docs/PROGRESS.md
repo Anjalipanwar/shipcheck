@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-13, after M3
-- **Next up:** M4 — AI flows with Stagehand + safety guard (waiting for the owner's "go", an AI key and the flow-design confirmation)
+- **Last updated:** 2026-11-13, after M4
+- **Next up:** M5 — mobile pass (waiting for the owner's "go")
 
 ## Overview
 
@@ -14,7 +14,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M1 — Fixture app with planted bugs                   | done        | `2d605ba` | yes    |
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
 | M3 — Report renderer and verdict                     | done        | `8e0b406` | yes    |
-| M4 — AI flows with Stagehand + safety guard          | not started | —         | —      |
+| M4 — AI flows with Stagehand + safety guard          | done        | see below | no     |
 | M5 — Mobile pass                                     | not started | —         | —      |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
 | M7 — CLI polish                                      | not started | —         | —      |
@@ -141,12 +141,47 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 ---
 
+## M4 — AI flows with Stagehand + safety guard
+
+- **Status:** done
+- **Commit:** the `feat(flows)` commit (see `git log`)
+- **Pushed:** no — waiting for the owner's answer
+
+**What was built:** model and key detection (`ai/models.ts`) with a friendly no-key message; `.env` loading; the AI call budget (`ai/budget.ts`); the Stagehand wrapper (`ai/driver.ts`); all prompts in `ai/prompts.ts`; the action guard (`browser/guard.ts`, `browser/element.ts`); the network backstop (`browser/backstop.ts`, `browser/cards.ts`); five flows (`flows/`: landing, signup, login, core, forms) built on one engine (`flows/context.ts`) that enforces observe → guard → act, step limits, screenshots and the action log.
+
+**Result against buggy-app with the real AI (Gemini `gemini-3.5-flash-lite`, built CLI):** bugs #2 and #7 found; signup, login and "Add a note" correctly reported as working; delete, checkout and card counters all 0; every action on the app's own address; 14 of 150 AI calls; 42 seconds. Without a key the CLI prints the three-step how-to and exits with code 2.
+
+**Tests:** 378 unit tests, 72 real-browser tests (no key needed, scripted stand-in for the AI), 7 real-AI tests (`npm run test:ai`). Removing the backstop, making the guard say yes to everything, and accepting dialogs were each tried on purpose; the tests caught all three.
+
+**Owner decisions and feedback**
+
+- "Go" for observe → guard → act, with three additions (all done): `act` gets the exact approved action; a backstop independent of the guard, proven with the guard switched off; every AI call counted per run and per flow, with the total printed.
+- The Gemini key lives in `.env` (see standing instructions). The first key was pasted into chat; the owner replaced it and deleted the old one.
+
+**Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
+
+1. Stagehand's self-heal is off — otherwise a failed action could be redirected to an element the guard never saw.
+2. The backstop also blocks data-changing requests that say delete/cancel/pay/checkout/invite and every HTTP DELETE. Needed for the owner's own guard-off test: the fixture's delete button has no dialog and its checkout posts to the app itself.
+3. Payment hosts: everything blocked except loading the provider's script (avoids false alarms on apps that load Stripe everywhere). This narrows the M2 decision that let payment widgets load.
+4. The guard makes no exception for "the test's own data": nothing that says delete or remove is clicked in v0.1.
+5. Measured before asked; an unconfirmed main feature goes to "couldn't test", not to a Blocker.
+6. Refused submissions (POST answered 4xx) are no longer reported as failed background requests.
+7. Default models; only Gemini verified live.
+8. Real-AI tests only via `npm run test:ai`; CI uses the scripted stand-in.
+
+**Open questions**
+
+- The forms flow reports a third, unplanted finding on buggy-app: a double click sends the contact form twice (Minor). It is true behaviour; recorded in `BUGS.md`. Keep, or make the fixture disable its button?
+- The real AI never wandered to the checkout page by itself, so the Info "Reached payment — stopped by design" (#10) appears only in the scripted tests so far.
+- Anthropic and OpenAI defaults are untested (no keys). The CI workflow has no manual real-AI job yet (planned with M8).
+- `CLAUDE.md` still says "Node ≥ 20" (carried over from M0).
+
+---
+
 ## Needed from the owner for later milestones
 
-| When | What                                                                                                                                                                                              |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M4   | An AI key in the terminal environment (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`) — never pasted into chat or a file. A paid key makes M4–M6 smoother than the free Gemini quota. |
-| M4   | Confirmation of the flow design: `observe` → safety guard → `act`, instead of Stagehand's free-running `agent()`.                                                                                 |
-| M8   | Optional `GEMINI_API_KEY` repo secret for the manual AI run in CI.                                                                                                                                |
-| M9   | One or two real apps the owner owns or may test, for sample reports. Confirmation of the LICENSE line "© 2026 Anjali Panwar".                                                                     |
-| M10  | Owner runs `npm login` and `npm publish`. Check beforehand that the `@anjalipanwar` npm scope belongs to the owner.                                                                               |
+| When | What                                                                                                                          |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------- |
+| M8   | Optional `GEMINI_API_KEY` repo secret for the manual AI run in CI.                                                            |
+| M9   | One or two real apps the owner owns or may test, for sample reports. Confirmation of the LICENSE line "© 2026 Anjali Panwar". |
+| M10  | Owner runs `npm login` and `npm publish`. Check beforehand that the `@anjalipanwar` npm scope belongs to the owner.           |

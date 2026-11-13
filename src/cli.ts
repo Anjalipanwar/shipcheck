@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
 import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 import { CommanderError } from 'commander';
+import { chooseModel } from './ai/models.js';
 import { ConfigError, loadConfig, type Config } from './config.js';
 import { buildProgram, EXIT } from './program.js';
 import { VERDICT_LABEL, countsLine } from './report/present.js';
@@ -42,15 +44,17 @@ function exitCodeFor(report: Report, failOn: Config['failOn']): number {
 
 async function run(urlArg: string, flags: Record<string, unknown>): Promise<number> {
   const config = loadConfig(urlArg, flags, process.env);
-  if (!config.noAi) {
-    throw new ConfigError(
-      'The AI-driven checks (signup, login, main feature, forms, mobile) are not built yet.\nFor now, add --no-ai to run the automatic checks.',
-    );
-  }
+  // Without a key this stops here with a how-to (exit code 2), before anything is opened.
+  const model = config.noAi ? undefined : chooseModel(process.env, config.model);
   await confirmOwnership(config);
 
   print(`\nShipCheck is checking ${config.url}\n`);
-  const result = await runShipCheck(config, { progress: (line) => print(`  ${line}`) });
+  if (model) print(`  AI model: ${model.stagehandModel} (key from ${model.keySource})\n`);
+  const result = await runShipCheck(
+    config,
+    { progress: (line) => print(`  ${line}`) },
+    model ? { model } : {},
+  );
   const outDir = resolve(config.out);
   const written = await writeReport(outDir, result.report, result.screenshots, result.redact);
 
@@ -64,8 +68,26 @@ async function run(urlArg: string, flags: Record<string, unknown>): Promise<numb
       print(`  ${index + 1}. [${finding.severity}] ${finding.title}`),
     );
   }
+  if (result.llm) {
+    const perFlow = Object.entries(result.llm.byFlow)
+      .map(([flow, calls]) => `${flow} ${calls}`)
+      .join(', ');
+    print(
+      `\nAI calls used: ${result.llm.total} of ${result.llm.max}${perFlow ? ` (${perFlow})` : ''}`,
+    );
+  }
   print(`\nReport: ${written.htmlPath}\n`);
   return exitCodeFor(report, config.failOn);
+}
+
+// A ".env" file in the current folder may hold the AI key (never committed, see .env.example).
+// Variables already set in the terminal win over the file.
+if (existsSync('.env')) {
+  try {
+    process.loadEnvFile('.env');
+  } catch {
+    // An unreadable .env is ignored; a missing key is explained later in plain words.
+  }
 }
 
 let exitCode: number = EXIT.passed;

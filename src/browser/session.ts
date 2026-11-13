@@ -1,4 +1,5 @@
 import { chromium, type Browser, type BrowserContext, type Page, type Response } from 'playwright';
+import { BACKSTOP_REASON_TEXT, installBackstop } from './backstop.js';
 import { withShipCheckSuffix, type DevicePreset } from './devices.js';
 import { createDomainLock, decideRoute, type DomainLock } from './domain.js';
 import { Evidence } from './evidence.js';
@@ -7,6 +8,11 @@ export interface SessionOptions {
   targetUrl: string;
   headed?: boolean;
   evidence?: Evidence;
+  /**
+   * Local port for the browser's remote-control connection, which the AI layer attaches to.
+   * Only opened for runs that use AI; it listens on this computer only.
+   */
+  cdpPort?: number;
 }
 
 export interface DevicePage {
@@ -70,7 +76,12 @@ export class BrowserSession {
 
   static async launch(options: SessionOptions): Promise<BrowserSession> {
     const lock = createDomainLock(options.targetUrl);
-    const browser = await chromium.launch({ headless: !options.headed });
+    const browser = await chromium.launch({
+      headless: !options.headed,
+      args: options.cdpPort
+        ? [`--remote-debugging-port=${options.cdpPort}`, '--remote-debugging-address=127.0.0.1']
+        : [],
+    });
     try {
       const cdp = await browser.newBrowserCDPSession();
       const { userAgent } = await cdp.send('Browser.getVersion');
@@ -106,6 +117,14 @@ export class BrowserSession {
     context.setDefaultTimeout(ACTION_TIMEOUT_MS);
     await installDomainLock(context, this.lock, (url, pageUrl) =>
       this.evidence.recordBlockedNavigation(device.name, pageUrl, url),
+    );
+    // Added after the domain lock, so it is asked first: nothing gets past the backstop.
+    await installBackstop(context, (reason, request, pageUrl) =>
+      this.evidence.recordBlockedRequest(device.name, pageUrl, {
+        url: request.url,
+        method: request.method,
+        reason: BACKSTOP_REASON_TEXT[reason],
+      }),
     );
     this.evidence.attach(context, device.name);
     const page = await context.newPage();

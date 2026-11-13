@@ -152,7 +152,8 @@ export function formatDuration(ms: number): string {
 
 export function modelLine(meta: Report['meta']): string {
   if (meta.mode === 'no-ai' || !meta.model) return 'None — automatic checks only';
-  return `${meta.model} (${meta.llmCalls} AI ${meta.llmCalls === 1 ? 'call' : 'calls'})`;
+  const limit = meta.llmCallLimit ? ` of ${meta.llmCallLimit} allowed` : '';
+  return `${meta.model} (${meta.llmCalls} AI ${meta.llmCalls === 1 ? 'call' : 'calls'}${limit})`;
 }
 
 /**

@@ -33,6 +33,8 @@ The fixture server sends no security headers, so the security-header check will 
 
 It runs on plain `http://127.0.0.1`. For local addresses (`localhost`, `127.0.0.1`, `::1`, `*.localhost`) the HTTPS check emits an **Info** finding "Local address — HTTPS not checked" instead of a missing-HTTPS problem. The real HTTPS check is unit-tested with a non-local `http://` URL.
 
+The contact form's button is not disabled while sending, so a quick double click sends the form twice. The forms flow reports this as **Minor** ("Clicking a form’s button twice sends it twice"). Found in M4; it is real behaviour of the fixture, so it is expected rather than planted.
+
 ## Notes on how the fixture is built
 
 - **The fake secret is never stored in the repo.** `assets/app.js` holds the placeholder `__FAKE_STRIPE_SECRET_KEY__`; the fixture server swaps in a fake key (`FAKE_SECRET_KEY`, built from parts) when it serves the file. A committed `sk_live_…` string would be blocked by GitHub's push protection and flagged by every secret scanner.
