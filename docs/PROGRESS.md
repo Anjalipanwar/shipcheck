@@ -14,7 +14,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M1 — Fixture app with planted bugs                   | done        | `2d605ba` | yes    |
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
 | M3 — Report renderer and verdict                     | done        | `8e0b406` | yes    |
-| M4 — AI flows with Stagehand + safety guard          | done        | see below | no     |
+| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63` | no     |
 | M5 — Mobile pass                                     | not started | —         | —      |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
 | M7 — CLI polish                                      | not started | —         | —      |
@@ -144,7 +144,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 ## M4 — AI flows with Stagehand + safety guard
 
 - **Status:** done
-- **Commit:** the `feat(flows)` commit (see `git log`)
+- **Commit:** `f5f7e63`
 - **Pushed:** no — waiting for the owner's answer
 
 **What was built:** model and key detection (`ai/models.ts`) with a friendly no-key message; `.env` loading; the AI call budget (`ai/budget.ts`); the Stagehand wrapper (`ai/driver.ts`); all prompts in `ai/prompts.ts`; the action guard (`browser/guard.ts`, `browser/element.ts`); the network backstop (`browser/backstop.ts`, `browser/cards.ts`); five flows (`flows/`: landing, signup, login, core, forms) built on one engine (`flows/context.ts`) that enforces observe → guard → act, step limits, screenshots and the action log.
