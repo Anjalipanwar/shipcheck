@@ -1,0 +1,11 @@
+dist/
+node_modules/
+shipcheck-report/
+package-lock.json
+test/fixtures/
+
+# owner-written docs: keep their formatting as-is
+CLAUDE.md
+docs/SPEC.md
+docs/BUILD_PLAN.md
+docs/KICKOFF_PROMPT.md

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+shipcheck-report/
+*.tsbuildinfo
+
+# secrets — never commit keys or credentials
+.env
+.env.*
+!.env.example
+
+# editor / OS
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
