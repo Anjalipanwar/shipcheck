@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact — NoteNest</title>
+    <meta name="description" content="NoteNest test fixture page." />
+    <meta property="og:title" content="NoteNest" />
+    <meta property="og:description" content="NoteNest test fixture page." />
+    <meta property="og:image" content="/og.svg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">NoteNest</a>
+      <nav aria-label="Main">
+        <a href="/features.html">Features</a>
+        <a href="/pricing.html">Pricing</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/login.html">Log in</a>
+        <a class="button small" href="/signup.html">Sign up</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Contact us</h1>
+      <form id="contact-form" class="card" novalidate>
+        <label for="contact-name">Your name</label>
+        <input id="contact-name" name="name" type="text" autocomplete="name" />
+        <label for="contact-email">Your email</label>
+        <input id="contact-email" name="email" type="text" autocomplete="email" />
+        <label for="contact-message">Message</label>
+        <textarea id="contact-message" name="message" rows="4"></textarea>
+        <p id="contact-result" class="message" role="status"></p>
+        <button class="button" type="submit">Send message</button>
+      </form>
+    </main>
+    <footer class="site-footer">
+      <p>NoteNest is a pretend app used to test ShipCheck. Nothing here is real.</p>
+    </footer>
+    <script src="/assets/app.js"></script>
+    <script src="/assets/contact.js"></script>
+  </body>
+</html>

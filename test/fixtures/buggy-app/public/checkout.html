@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Upgrade to Pro — NoteNest</title>
+    <meta name="description" content="NoteNest test fixture page." />
+    <meta property="og:title" content="NoteNest" />
+    <meta property="og:description" content="NoteNest test fixture page." />
+    <meta property="og:image" content="/og.svg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">NoteNest</a>
+      <nav aria-label="Main">
+        <a href="/features.html">Features</a>
+        <a href="/pricing.html">Pricing</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/login.html">Log in</a>
+        <a class="button small" href="/signup.html">Sign up</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Upgrade to Pro</h1>
+      <form id="checkout-form" class="card" novalidate>
+        <p>NoteNest Pro — €9 per month</p>
+        <label for="card-number">Card number</label>
+        <input id="card-number" name="cardnumber" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" />
+        <label for="card-expiry">Expiry date</label>
+        <input id="card-expiry" name="exp-date" type="text" autocomplete="cc-exp" placeholder="MM / YY" />
+        <label for="card-cvc">Security code</label>
+        <input id="card-cvc" name="cvc" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="CVC" />
+        <p id="checkout-message" class="message" role="status"></p>
+        <button class="button" type="submit">Pay €9 now</button>
+      </form>
+      <p><a href="/dashboard.html">Back to your notes</a></p>
+    </main>
+    <footer class="site-footer">
+      <p>NoteNest is a pretend app used to test ShipCheck. Nothing here is real.</p>
+    </footer>
+    <script src="/assets/app.js"></script>
+    <script src="/assets/checkout.js"></script>
+  </body>
+</html>

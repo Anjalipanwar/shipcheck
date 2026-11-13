@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Account settings — NoteNest</title>
+    <meta name="description" content="NoteNest test fixture page." />
+    <meta property="og:title" content="NoteNest" />
+    <meta property="og:description" content="NoteNest test fixture page." />
+    <meta property="og:image" content="/og.svg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">NoteNest</a>
+      <nav aria-label="Main">
+        <a href="/features.html">Features</a>
+        <a href="/pricing.html">Pricing</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/login.html">Log in</a>
+        <a class="button small" href="/signup.html">Sign up</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Account settings</h1>
+      <section class="card">
+        <h2>Profile</h2>
+        <label for="display-name">Display name</label>
+        <input id="display-name" name="displayName" type="text" autocomplete="nickname" />
+        <p id="account-message" class="message" role="status"></p>
+        <button id="save-profile" class="button" type="button">Save changes</button>
+      </section>
+      <section class="card danger">
+        <h2>Danger zone</h2>
+        <p>This permanently removes your account and all your notes.</p>
+        <button id="delete-account" class="button danger" type="button">Delete account</button>
+      </section>
+      <p><a href="/dashboard.html">Back to your notes</a></p>
+    </main>
+    <footer class="site-footer">
+      <p>NoteNest is a pretend app used to test ShipCheck. Nothing here is real.</p>
+    </footer>
+    <script src="/assets/app.js"></script>
+    <script src="/assets/account.js"></script>
+  </body>
+</html>
