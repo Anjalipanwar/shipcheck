@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeFinding, type Report } from '../../../src/report/schema.js';
-import { writeReport } from '../../../src/report/write.js';
+import { redactDeep, writeReport } from '../../../src/report/write.js';
 
 let dir: string;
 beforeEach(async () => {
@@ -56,6 +56,14 @@ describe('writeReport', () => {
       passed: ['Home page opens'],
     });
     expect(await readdir(join(out, 'screenshots'))).toEqual(['01-desktop-home-page.jpg']);
+    expect((await readdir(out)).sort()).toEqual([
+      'report.html',
+      'report.json',
+      'report.md',
+      'screenshots',
+    ]);
+    expect(await readFile(written.htmlPath, 'utf8')).toContain('Ready to launch');
+    expect(await readFile(written.markdownPath, 'utf8')).toContain('**Verdict: Ready to launch**');
   });
 
   it('scrubs protected values from the file as a last line of defence', async () => {
@@ -76,12 +84,39 @@ describe('writeReport', () => {
       ],
       counts: { blocker: 0, major: 0, minor: 0, info: 1 },
     });
-    const { jsonPath } = await writeReport(dir, leaky, [], (text) =>
+    const written = await writeReport(dir, leaky, [], (text) =>
       text.split('MyP@ssw0rd!').join('[hidden]'),
     );
-    const text = await readFile(jsonPath, 'utf8');
-    expect(text).not.toContain('MyP@ssw0rd!');
-    expect(text).toContain('[hidden]');
+    for (const path of [written.jsonPath, written.htmlPath, written.markdownPath]) {
+      const text = await readFile(path, 'utf8');
+      expect(text, path).not.toContain('MyP@ssw0rd!');
+      expect(text, path).toContain('[hidden]');
+    }
+  });
+
+  it('scrubs passwords that contain quotes, backslashes or HTML characters', async () => {
+    // These are written differently in JSON ( \" ) and HTML ( &lt; ), so scrubbing the finished
+    // files would miss them. The report text is scrubbed before any file is produced.
+    const password = 'p"a\\ss<&>word';
+    const leaky = report({ passed: [`Logged in with ${password}`] });
+    const written = await writeReport(dir, leaky, [], (text) =>
+      text.split(password).join('[hidden]'),
+    );
+    expect(JSON.parse(await readFile(written.jsonPath, 'utf8')).passed).toEqual([
+      'Logged in with [hidden]',
+    ]);
+    const html = await readFile(written.htmlPath, 'utf8');
+    expect(html).toContain('Logged in with [hidden]');
+    expect(html).not.toContain('ss&lt;&amp;&gt;word');
+    expect(await readFile(written.markdownPath, 'utf8')).toContain('Logged in with \\[hidden\\]');
+  });
+
+  it('redactDeep reaches text at any depth and leaves other values alone', () => {
+    const upper = (text: string) => text.toUpperCase();
+    expect(redactDeep({ a: 'x', b: [{ c: 'y', d: 3, e: null, f: true }] }, upper)).toEqual({
+      a: 'X',
+      b: [{ c: 'Y', d: 3, e: null, f: true }],
+    });
   });
 
   it('refuses to write a report that breaks the schema', async () => {

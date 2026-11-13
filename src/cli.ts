@@ -4,17 +4,13 @@ import { resolve } from 'node:path';
 import { CommanderError } from 'commander';
 import { ConfigError, loadConfig, type Config } from './config.js';
 import { buildProgram, EXIT } from './program.js';
+import { VERDICT_LABEL, countsLine } from './report/present.js';
 import type { Report } from './report/schema.js';
+import { topIssues } from './report/verdict.js';
 import { writeReport } from './report/write.js';
 import { runShipCheck } from './runner.js';
 
 const print = (line = ''): void => void process.stdout.write(`${line}\n`);
-
-const VERDICT_TEXT: Record<Report['verdict'], string> = {
-  ready: 'Ready to launch',
-  'fix-before-launch': 'Fix before launch',
-  'not-ready': 'Not ready',
-};
 
 /** SPEC §7.7: ask once, unless --yes was given or we are running in CI. */
 async function confirmOwnership(config: Config): Promise<void> {
@@ -59,19 +55,16 @@ async function run(urlArg: string, flags: Record<string, unknown>): Promise<numb
   const written = await writeReport(outDir, result.report, result.screenshots, result.redact);
 
   const { report } = result;
-  const { counts } = report;
-  print(`\nVerdict: ${VERDICT_TEXT[report.verdict]}`);
-  print(
-    `  ${counts.blocker} blocker · ${counts.major} major · ${counts.minor} minor · ${counts.info} info`,
-  );
-  const top = report.findings.filter((f) => f.severity !== 'info').slice(0, 3);
+  print(`\nVerdict: ${VERDICT_LABEL[report.verdict]}`);
+  print(`  ${countsLine(report.counts)}`);
+  const top = topIssues(report.findings);
   if (top.length > 0) {
     print('\nFix these first:');
     top.forEach((finding, index) =>
       print(`  ${index + 1}. [${finding.severity}] ${finding.title}`),
     );
   }
-  print(`\nReport: ${written.jsonPath}\n`);
+  print(`\nReport: ${written.htmlPath}\n`);
   return exitCodeFor(report, config.failOn);
 }
 

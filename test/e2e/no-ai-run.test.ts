@@ -190,9 +190,11 @@ describe('safety (SPEC §7)', () => {
   });
 
   it('wrote no password anywhere in the output folder', async () => {
-    for (const name of await readdir(outDir, { recursive: true })) {
-      if (!name.endsWith('.json')) continue;
-      expect(await readFile(join(outDir, name), 'utf8')).not.toContain('e2e-Secret-Pass-123');
+    const names = await readdir(outDir, { recursive: true });
+    expect(names).toEqual(expect.arrayContaining(['report.json', 'report.html', 'report.md']));
+    for (const name of names) {
+      if (!/\.(json|html|md)$/.test(name)) continue;
+      expect(await readFile(join(outDir, name), 'utf8'), name).not.toContain('e2e-Secret-Pass-123');
     }
   });
 

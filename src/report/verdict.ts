@@ -16,6 +16,13 @@ export function computeVerdict(findings: readonly Finding[]): Verdict {
   return 'ready';
 }
 
+/** "Fix these first" (SPEC §5.3): the most severe real problems. Info notes never qualify. */
+export function topIssues(findings: readonly Finding[], limit = 3): Finding[] {
+  return rankFindings(findings)
+    .filter((finding) => finding.severity !== 'info')
+    .slice(0, limit);
+}
+
 /** Most severe first; ties keep their original order so reports are stable between runs. */
 export function rankFindings(findings: readonly Finding[]): Finding[] {
   return findings

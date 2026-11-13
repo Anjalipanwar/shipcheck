@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-13, after M2
-- **Next up:** M3 — report renderer and verdict (waiting for the owner's "go")
+- **Last updated:** 2026-11-13, after M3
+- **Next up:** M4 — AI flows with Stagehand + safety guard (waiting for the owner's "go", an AI key and the flow-design confirmation)
 
 ## Overview
 
@@ -13,7 +13,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M0 — Scaffold                                        | done        | `b59adfc` | yes    |
 | M1 — Fixture app with planted bugs                   | done        | `2d605ba` | yes    |
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
-| M3 — Report renderer and verdict                     | not started | —         | —      |
+| M3 — Report renderer and verdict                     | done        | see log   | no     |
 | M4 — AI flows with Stagehand + safety guard          | not started | —         | —      |
 | M5 — Mobile pass                                     | not started | —         | —      |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
@@ -106,6 +106,36 @@ Updated at the end of every milestone. Read this at the start of every session.
 - Is "broken internal link = Major" the right severity, or should it be Minor?
 - The first CI run on GitHub (started by the push) has not been checked yet.
 - Stagehand `act` / `observe` on Playwright-owned pages is untested until an AI key is available (M4). Reading pages (`extract`) is confirmed.
+
+---
+
+## M3 — Report renderer and verdict
+
+- **Status:** done
+- **Commit:** the `feat(report)` commit right after `b7f09f0` (see `git log`)
+- **Pushed:** no — waiting for the owner's answer
+
+**What was built:** `report.html` (one self-contained file: verdict banner, "Fix these first", issue cards with evidence and fix-prompt copy buttons, screenshot lightbox, light/dark, phone layout), `report.md`, the GitHub step-summary text (used in M8), shared wording in `report/present.ts`. A `--no-ai` run now writes all three files and the CLI prints the path of `report.html`. The verdict rules were already built and tested in M2; M3 added the "top 3" ranking.
+
+**Result against buggy-app (`--no-ai`):** `report.html` is about 70 KB (limit 5 MB) with the same eight findings as M2. 273 unit tests and 45 real-browser tests pass. The browser tests open the real report and check: no errors, no network requests, copy button, lightbox, no serious accessibility problems (desktop and phone, light and dark), no sideways scroll on a phone, readable without JavaScript, no password or unmasked key in any file. Three deliberate breakages (wrong script hash, pale text, unwrapped long text) were each caught by these tests.
+
+**Owner decisions and feedback**
+
+- None yet for M3.
+
+**Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
+
+1. Section grouping in "All issues", including four sections the spec did not name ("Across the app", "Accessibility", "Speed", "Other notes").
+2. A note under the verdict when the run used no AI or stopped early.
+3. The report file is locked down (cannot load or send anything; app text cannot run as code).
+4. Screenshots embedded once, 4.3 MB picture budget, overflow linked as files; extra section "Your app as ShipCheck saw it".
+5. Password scrubbing moved before file creation — closes a gap from M2 (a password containing a quote or backslash would not have been scrubbed from `report.json`).
+6. Dates in UTC; action log only in `report.json`; `report.md` names screenshot files.
+
+**Open questions**
+
+- None of the eight buggy-app findings has a screenshot attached yet (the automatic checks produce log evidence). Screenshot-in-card layout is covered by unit tests and will first show real pictures in M4.
+- Auto-opening the report after a run is M7, per the build plan.
 
 ---
 

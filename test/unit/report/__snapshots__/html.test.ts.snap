@@ -1,0 +1,128 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`HTML structure snapshot > matches the stored structure of a report that uses every part of the layout 1`] = `
+"<a class="skip" href="#main">Skip to the report</a>
+<header class="top"><div class="wrap">
+<p class="brand">ShipCheck</p>
+<h1>Pre-launch report</h1>
+<dl class="meta">
+<div><dt>App</dt><dd><a href="https://myapp.example.com/" rel="noopener noreferrer">https://myapp.example.com/</a></dd></div>
+<div><dt>Date</dt><dd>13 November 2026, 17:57 UTC</dd></div>
+<div><dt>Duration</dt><dd>2 seconds</dd></div>
+<div><dt>AI model</dt><dd>None — automatic checks only</dd></div>
+<div><dt>ShipCheck version</dt><dd>0.1.0</dd></div>
+</dl>
+</div></header>
+<main id="main" class="wrap">
+<section class="verdict v-not-ready" aria-labelledby="verdict-title">
+<h2 id="verdict-title">Verdict</h2>
+<p class="big">Not ready</p>
+<p>At least one problem would stop a new user or put your accounts at risk. Fix the blockers before you launch.</p>
+<ul class="counts" aria-label="Issues by severity"><li><span class="badge sev-blocker" title="Blocker: a new user cannot get through, or a secret is exposed">1 Blocker</span></li><li><span class="badge sev-major" title="Major: it works, but is broken or confusing for many users">1 Major</span></li><li><span class="badge sev-minor" title="Minor: polish and edge cases">1 Minor</span></li><li><span class="badge sev-info" title="Info: good to know, not a bug">1 Info</span></li></ul>
+</section>
+<p class="caveat"><strong>Note:</strong> This verdict is based on the automatic checks only. Signing up, logging in, the main feature, forms and the phone-sized pass were not tested, because this run used no AI key.</p>
+<section aria-labelledby="first-title">
+<h2 id="first-title">Fix these first</h2>
+<div class="panel"><ol class="first"><li><span class="badge sev-blocker">Blocker</span><a href="#issue-1">A secret key is visible to anyone who visits your app</a></li><li><span class="badge sev-major">Major</span><a href="#issue-2">Login shows no message when the password is wrong</a></li><li><span class="badge sev-minor">Minor</span><a href="#issue-3">Your home page has no description for search results</a></li></ol></div>
+</section>
+<section aria-labelledby="look-title">
+<h2 id="look-title">Your app as ShipCheck saw it</h2>
+<div class="panel"><div class="shots"><figure><button type="button" class="shot" data-shot="shot-2" aria-label="Enlarge screenshot: home page (desktop)"><img id="shot-2" src="data:image/jpeg;base64,…" alt="Screenshot: home page (desktop)"></button><figcaption>home page (desktop)<span class="zoom"> — click to enlarge</span></figcaption></figure></div></div>
+</section>
+<section aria-labelledby="issues-title">
+<h2 id="issues-title">All issues (4)</h2>
+<p class="legend">“Verified” means an automatic check measured it. “AI judgement” means the AI tester saw it while using the app — worth a quick look yourself.</p>
+<h3>Login</h3>
+<article class="card c-major" id="issue-2" aria-labelledby="issue-2-title">
+<h4 id="issue-2-title">Login shows no message when the password is wrong</h4>
+<ul class="badges">
+<li><span class="badge sev-major">Major</span></li>
+<li><span class="tag">Functionality</span></li>
+<li><span class="tag">Desktop</span></li>
+<li><span class="tag">AI judgement</span></li>
+</ul>
+<h5>What happened</h5><p>It broke.</p>
+<h5>Why it matters</h5><p>People notice.</p>
+<h5>Steps to reproduce</h5>
+<ol class="steps"><li>Open the page.</li><li>Click the button.</li></ol>
+<h5>Evidence</h5>
+<div class="shots"><figure><button type="button" class="shot" data-shot="shot-1" aria-label="Enlarge screenshot: login failed (desktop)"><img id="shot-1" src="data:image/jpeg;base64,…" alt="Screenshot: login failed (desktop)"></button><figcaption>login failed (desktop)<span class="zoom"> — click to enlarge</span></figcaption></figure></div>
+<p class="where">Where: <a href="https://myapp.example.com/login" rel="noopener noreferrer">https://myapp.example.com/login</a></p>
+</article>
+<h3>Security</h3>
+<article class="card c-blocker" id="issue-1" aria-labelledby="issue-1-title">
+<h4 id="issue-1-title">A secret key is visible to anyone who visits your app</h4>
+<ul class="badges">
+<li><span class="badge sev-blocker">Blocker</span></li>
+<li><span class="tag">Security</span></li>
+<li><span class="tag">Desktop and phone</span></li>
+<li><span class="tag">Verified</span></li>
+</ul>
+<h5>What happened</h5><p>It broke.</p>
+<h5>Why it matters</h5><p>People notice.</p>
+<h5>Steps to reproduce</h5>
+<ol class="steps"><li>Open the page.</li><li>Click the button.</li></ol>
+<h5>Evidence</h5>
+<p class="where">Where: <a href="https://myapp.example.com/assets/app.js" rel="noopener noreferrer">https://myapp.example.com/assets/app.js</a></p>
+<details><summary>Technical details (1 line)</summary><pre>Stripe secret key: sk_liv…eal1</pre></details>
+<div class="fix">
+<div class="fix-head"><h5>Fix prompt</h5><button type="button" class="copy" data-copy="issue-1-prompt" aria-label="Copy fix prompt: A secret key is visible to anyone who visits your app">Copy</button></div>
+<p class="hint">Paste this into Lovable, Bolt, Cursor or Claude Code.</p>
+<pre id="issue-1-prompt">Remove the key from client-side code.</pre>
+</div>
+</article>
+<article class="card c-info" id="issue-4" aria-labelledby="issue-4-title">
+<h4 id="issue-4-title">Local address — HTTPS not checked</h4>
+<ul class="badges">
+<li><span class="badge sev-info">Info</span></li>
+<li><span class="tag">Security</span></li>
+<li><span class="tag">Desktop</span></li>
+<li><span class="tag">Verified</span></li>
+</ul>
+<h5>What happened</h5><p>It broke.</p>
+<h5>Why it matters</h5><p>People notice.</p>
+<h5>Evidence</h5>
+<details><summary>Technical details (1 line)</summary><pre>a log line</pre></details>
+</article>
+<h3>Search and sharing (SEO)</h3>
+<article class="card c-minor" id="issue-3" aria-labelledby="issue-3-title">
+<h4 id="issue-3-title">Your home page has no description for search results</h4>
+<ul class="badges">
+<li><span class="badge sev-minor">Minor</span></li>
+<li><span class="tag">SEO</span></li>
+<li><span class="tag">Desktop and phone</span></li>
+<li><span class="tag">Verified</span></li>
+</ul>
+<h5>What happened</h5><p>It broke.</p>
+<h5>Why it matters</h5><p>People notice.</p>
+<h5>Steps to reproduce</h5>
+<ol class="steps"><li>Open the page.</li><li>Click the button.</li></ol>
+<h5>Evidence</h5>
+<details><summary>Technical details (1 line)</summary><pre>No &lt;meta name=&quot;description&quot;&gt; found</pre></details>
+<div class="fix">
+<div class="fix-head"><h5>Fix prompt</h5><button type="button" class="copy" data-copy="issue-3-prompt" aria-label="Copy fix prompt: Your home page has no description for search results">Copy</button></div>
+<p class="hint">Paste this into Lovable, Bolt, Cursor or Claude Code.</p>
+<pre id="issue-3-prompt">Add a &lt;meta name=&quot;description&quot;&gt; tag.</pre>
+</div>
+</article>
+</section>
+<section aria-labelledby="worked-title">
+<h2 id="worked-title">What worked</h2>
+<div class="panel"><ul class="list worked"><li>Home page opens</li><li>Home page has a title</li></ul></div>
+</section>
+<section aria-labelledby="skipped-title">
+<h2 id="skipped-title">What we couldn’t test</h2>
+<div class="panel"><ul class="list skipped"><li>Signing up — needs an AI key</li></ul></div>
+</section>
+</main>
+<footer><div class="wrap">
+<p>ShipCheck is an automated pre-launch check. It is not a security audit and not a guarantee that the app is free of bugs.</p>
+<p>Not checked: active security testing, completing a payment, emails the app sends, business rules beyond what is visible on screen, behaviour under heavy traffic, and native mobile apps.</p>
+<p>Made with <a href="https://github.com/Anjalipanwar/shipcheck" rel="noopener noreferrer">ShipCheck</a> 0.1.0 — free and open source.</p>
+</div></footer>
+<dialog id="lightbox" aria-labelledby="lightbox-title">
+<div class="bar"><strong id="lightbox-title" class="caption">Screenshot</strong><button type="button" data-close>Close</button></div>
+<img src="data:image/gif;base64,…" alt="">
+</dialog>
+<div id="status" class="sr-only" role="status" aria-live="polite"></div>"
+`;
