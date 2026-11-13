@@ -7,6 +7,7 @@ ShipCheck is an open-source CLI + GitHub Action: an AI agent uses a vibe-coded w
 - **Owner:** Anjali Panwar — 10+ years QA automation engineer. Expect and welcome QA-grade rigor. Explain decisions in plain language.
 
 ## How to work
+- At the start of every session, read `docs/PROGRESS.md`. Keep it updated at the end of every milestone (status, commit hash, pushed yes/no, owner decisions and feedback, open questions).
 - Work one milestone at a time from `docs/BUILD_PLAN.md`. Stop after each milestone, report status (what's done, how you verified it, anything off-spec), and wait for "go" unless told to continue.
 - Before using any third-party API (especially Stagehand, Playwright, AI SDKs), check current official docs/README or the installed package's types. Never invent APIs from memory.
 - Write tests alongside code. A milestone is not done until `npm run typecheck && npm run lint && npm test` pass.
