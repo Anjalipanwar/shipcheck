@@ -57,6 +57,8 @@ export interface FixtureServer {
   contactSubmissions: ContactSubmission[];
   /** Every request as "METHOD /path", in order. */
   requests: string[];
+  /** The User-Agent header of every request, in order. */
+  userAgents: string[];
   close(): Promise<void>;
 }
 
@@ -136,6 +138,7 @@ export async function startFixtureServer(): Promise<FixtureServer> {
   };
   const contactSubmissions: ContactSubmission[] = [];
   const requests: string[] = [];
+  const userAgents: string[] = [];
   const accounts = new Map<string, string>([[DEMO_ACCOUNT.email, DEMO_ACCOUNT.password]]);
 
   async function handleApi(path: string, req: IncomingMessage, res: ServerResponse) {
@@ -200,6 +203,7 @@ export async function startFixtureServer(): Promise<FixtureServer> {
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     const method = req.method ?? 'GET';
     requests.push(`${method} ${path}`);
+    userAgents.push(req.headers['user-agent'] ?? '');
 
     const work =
       path.startsWith('/api/') && method === 'POST'
@@ -226,6 +230,7 @@ export async function startFixtureServer(): Promise<FixtureServer> {
     hits,
     contactSubmissions,
     requests,
+    userAgents,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.closeAllConnections();

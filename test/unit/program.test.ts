@@ -29,6 +29,7 @@ describe('CLI definition', () => {
       '--flows',
       '--max-minutes',
       '--fail-on',
+      '--no-ai',
       '--headed',
       '--yes',
     ]) {

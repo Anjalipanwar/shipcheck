@@ -1,8 +1,6 @@
 import { Command, Option } from 'commander';
+import { FAIL_ON_LEVELS, FLOW_NAMES } from './config.js';
 import { VERSION } from './version.js';
-
-export const FLOW_NAMES = ['landing', 'signup', 'login', 'core', 'forms'] as const;
-export const FAIL_ON_LEVELS = ['blocker', 'major', 'none'] as const;
 
 /** Exit codes from SPEC §5.1. */
 export const EXIT = { passed: 0, issuesFound: 1, shipcheckFailed: 2 } as const;
@@ -35,6 +33,7 @@ export function buildProgram(run: RunHandler): Command {
         .choices(FAIL_ON_LEVELS)
         .default('blocker'),
     )
+    .option('--no-ai', 'run only the automatic checks that need no AI key')
     .option('--headed', 'show the browser while testing (debugging)', false)
     .option('--yes', 'skip the "do you own this app?" confirmation', false)
     .showHelpAfterError('(run "shipcheck --help" for usage)')
