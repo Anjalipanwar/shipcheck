@@ -13,7 +13,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M0 — Scaffold                                        | done        | `b59adfc` | yes    |
 | M1 — Fixture app with planted bugs                   | done        | `2d605ba` | yes    |
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
-| M3 — Report renderer and verdict                     | done        | `8e0b406` | no     |
+| M3 — Report renderer and verdict                     | done        | `8e0b406` | yes    |
 | M4 — AI flows with Stagehand + safety guard          | not started | —         | —      |
 | M5 — Mobile pass                                     | not started | —         | —      |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
@@ -28,6 +28,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 - **After each milestone, ask whether to push before starting the next one.** Never push without that answer. (2026-11-13)
 - **Git author for this repo:** Anjali Panwar, `official.anjali@gmail.com` (set in the repo's git config). Do not rewrite existing commits. (2026-11-13)
 - Keep this file updated at the end of every milestone. (2026-11-13)
+- **AI key:** the owner's Gemini key lives in `.env` in the project folder as `GEMINI_API_KEY` (ignored by git, readable only by the owner's user). Never print it, never copy it into another file, a commit, a log or a report. `.env.example` is the committed template without a key. (2026-11-13)
 - Follow SPEC §7 safety rules exactly; never test against real third-party sites in automated tests; do not publish to npm unless asked.
 
 ---
@@ -113,7 +114,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - **Status:** done
 - **Commit:** `8e0b406`
-- **Pushed:** no — waiting for the owner's answer
+- **Pushed:** yes (2026-11-13)
 
 **What was built:** `report.html` (one self-contained file: verdict banner, "Fix these first", issue cards with evidence and fix-prompt copy buttons, screenshot lightbox, light/dark, phone layout), `report.md`, the GitHub step-summary text (used in M8), shared wording in `report/present.ts`. A `--no-ai` run now writes all three files and the CLI prints the path of `report.html`. The verdict rules were already built and tested in M2; M3 added the "top 3" ranking.
 
@@ -121,7 +122,8 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 **Owner decisions and feedback**
 
-- None yet for M3.
+- Push M3: yes. No objection raised to the M3 choices below.
+- Gave a Gemini API key for M4 and asked for it to be kept in `.env`, out of git.
 
 **Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
 
