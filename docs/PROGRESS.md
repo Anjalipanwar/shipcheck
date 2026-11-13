@@ -13,7 +13,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M0 — Scaffold                                        | done        | `b59adfc` | yes    |
 | M1 — Fixture app with planted bugs                   | done        | `2d605ba` | yes    |
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
-| M3 — Report renderer and verdict                     | done        | see log   | no     |
+| M3 — Report renderer and verdict                     | done        | `8e0b406` | no     |
 | M4 — AI flows with Stagehand + safety guard          | not started | —         | —      |
 | M5 — Mobile pass                                     | not started | —         | —      |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
@@ -112,7 +112,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 ## M3 — Report renderer and verdict
 
 - **Status:** done
-- **Commit:** the `feat(report)` commit right after `b7f09f0` (see `git log`)
+- **Commit:** `8e0b406`
 - **Pushed:** no — waiting for the owner's answer
 
 **What was built:** `report.html` (one self-contained file: verdict banner, "Fix these first", issue cards with evidence and fix-prompt copy buttons, screenshot lightbox, light/dark, phone layout), `report.md`, the GitHub step-summary text (used in M8), shared wording in `report/present.ts`. A `--no-ai` run now writes all three files and the CLI prints the path of `report.html`. The verdict rules were already built and tested in M2; M3 added the "top 3" ranking.
