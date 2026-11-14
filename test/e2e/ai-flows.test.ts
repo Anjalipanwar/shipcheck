@@ -10,7 +10,7 @@ import { loadConfig } from '../../src/config.js';
 import { ReportSchema, type Report } from '../../src/report/schema.js';
 import { runShipCheck, type RunResult } from '../../src/runner.js';
 import { createScriptedDriver } from '../helpers/scripted-driver.js';
-import { startFixtureServer, type FixtureServer } from '../helpers/fixture-server.js';
+import { DEMO_ACCOUNT, startFixtureServer, type FixtureServer } from '../helpers/fixture-server.js';
 
 /**
  * Full runs against the buggy fixture app with a scripted stand-in for the AI (no key needed).
@@ -230,8 +230,8 @@ describe('a misbehaving AI that goes for the traps', () => {
         for (const entry of deleteClicks) expect(entry.result).toBe('blocked');
       } else {
         expect(deleteClicks.map((a) => a.result)).toEqual(['ok']); // clicked once, then stopped
-        expect(report.notTested.join('\n')).toMatch(
-          /Stopped by design — ShipCheck’s safety net blocked/,
+        expect(report.notTested).toContain(
+          'Requests that could delete data, cancel something or start a payment were blocked by design (POST /api/delete-account)',
         );
         expect(report.meta.partial).toBe(true);
       }
@@ -267,6 +267,44 @@ describe('a misbehaving AI that goes for the traps', () => {
       }
     },
   );
+});
+
+describe('a log-in that the server refuses with 4xx although the details are right', () => {
+  it('is still reported as a broken login (Blocker), not hidden as a “refused submission”', async () => {
+    const app = await startFixtureServer({ rejectAllLogins: true });
+    try {
+      const result = await runShipCheck(
+        loadConfig(
+          app.url,
+          {
+            yes: true,
+            flows: 'signup,login',
+            email: DEMO_ACCOUNT.email,
+            password: DEMO_ACCOUNT.password,
+          },
+          {},
+        ),
+        {},
+        { aiDriver: (budget) => createScriptedDriver({ budget }) },
+      );
+      const report = ReportSchema.parse(result.report);
+      const finding = report.findings.find((f) => f.rule === 'login/fails');
+      expect(finding).toMatchObject({
+        severity: 'blocker',
+        flow: 'login',
+        title: 'Users cannot log in',
+      });
+      expect(finding?.evidence.screenshots).toHaveLength(1);
+      // Both attempts reached the server and both were answered 401.
+      expect(app.hits).toMatchObject({ login: 2, loginFailed: 2 });
+      expect(report.passed).not.toContain('Logging in with the correct password works');
+      expect(report.verdict).toBe('not-ready');
+      // The password never appears in the report.
+      expect(JSON.stringify(report)).not.toContain(DEMO_ACCOUNT.password);
+    } finally {
+      await app.close();
+    }
+  });
 });
 
 describe('budgets', () => {

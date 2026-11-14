@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-13, after M4
-- **Next up:** M5 — mobile pass (waiting for the owner's "go")
+- **Last updated:** 2026-11-14, M4 follow-ups done; M5 in progress
+- **Next up:** M5 — mobile pass (owner said "go" on 2026-11-14)
 
 ## Overview
 
@@ -30,6 +30,8 @@ Updated at the end of every milestone. Read this at the start of every session.
 - Keep this file updated at the end of every milestone. (2026-11-13)
 - **AI key:** the owner's Gemini key lives in `.env` in the project folder as `GEMINI_API_KEY` (ignored by git, readable only by the owner's user). Never print it, never copy it into another file, a commit, a log or a report. `.env.example` is the committed template without a key. (2026-11-13)
 - Follow SPEC §7 safety rules exactly; never test against real third-party sites in automated tests; do not publish to npm unless asked.
+- **Errors caused by ShipCheck's own blocking** (backstop, payment hosts, domain lock) are never reported as app bugs; they are tagged and listed under "What we couldn't test". (2026-11-14)
+- **Broken internal links:** Major in the header/main navigation or on a primary call-to-action (sign up, log in, checkout, main button); Minor elsewhere. (2026-11-14)
 
 ---
 
@@ -90,9 +92,9 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - Push order: M0 + M1 first, then M2 as a separate push. Done.
 - The first push attempts were rejected by GitHub ("push declined due to email privacy restrictions"). Owner chose to keep the Gmail address and changed the GitHub setting; pushes then went through.
-- No feedback yet on the builder's M2 choices listed below — they stand until the owner says otherwise.
+- 2026-11-14: owner approved all M2 choices below; choice 3 was refined (broken link severity now depends on placement — see M4 follow-ups).
 
-**Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
+**Builder's choices — approved by the owner on 2026-11-14** (details in `docs/SPEC.md` §13)
 
 1. Playwright launches the browser and Stagehand attaches to it (reverses the M0 note).
 2. The domain lock blocks top-level page navigations only; background requests and embedded frames to other sites are allowed.
@@ -104,9 +106,9 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 **Open questions**
 
-- Is "broken internal link = Major" the right severity, or should it be Minor?
-- The first CI run on GitHub (started by the push) has not been checked yet.
-- Stagehand `act` / `observe` on Playwright-owned pages is untested until an AI key is available (M4). Reading pages (`extract`) is confirmed.
+- ~~Is "broken internal link = Major" right?~~ Answered 2026-11-14: depends on placement.
+- ~~First CI run not checked.~~ Checked 2026-11-14: every run on GitHub is green (latest: `1d133b8`).
+- ~~Stagehand `act` / `observe` untested.~~ Confirmed in M4 with the real Gemini key.
 
 ---
 
@@ -124,8 +126,9 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - Push M3: yes. No objection raised to the M3 choices below.
 - Gave a Gemini API key for M4 and asked for it to be kept in `.env`, out of git.
+- 2026-11-14: owner approved all M3 choices below.
 
-**Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
+**Builder's choices — approved by the owner on 2026-11-14** (details in `docs/SPEC.md` §13)
 
 1. Section grouping in "All issues", including four sections the spec did not name ("Across the app", "Accessibility", "Speed", "Other notes").
 2. A note under the verdict when the run used no AI or stopped early.
@@ -157,8 +160,9 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - "Go" for observe → guard → act, with three additions (all done): `act` gets the exact approved action; a backstop independent of the guard, proven with the guard switched off; every AI call counted per run and per flow, with the total printed.
 - The Gemini key lives in `.env` (see standing instructions). The first key was pasted into chat; the owner replaced it and deleted the old one.
+- 2026-11-14: owner approved all M4 choices below, adding the rule that ShipCheck's own blocking is never an app bug (done, see follow-ups).
 
-**Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
+**Builder's choices — approved by the owner on 2026-11-14** (details in `docs/SPEC.md` §13)
 
 1. Stagehand's self-heal is off — otherwise a failed action could be redirected to an element the guard never saw.
 2. The backstop also blocks data-changing requests that say delete/cancel/pay/checkout/invite and every HTTP DELETE. Needed for the owner's own guard-off test: the fixture's delete button has no dialog and its checkout posts to the app itself.
@@ -171,10 +175,36 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 **Open questions**
 
-- The forms flow reports a third, unplanted finding on buggy-app: a double click sends the contact form twice (Minor). It is true behaviour; recorded in `BUGS.md`. Keep, or make the fixture disable its button?
+- ~~Double submit on the contact form: keep?~~ Answered 2026-11-14: planted as bug #11, with the newsletter form as its opposite case. Commit `1d133b8`, pushed after `npm run test:ai` passed (8/8, 23 AI calls).
 - The real AI never wandered to the checkout page by itself, so the Info "Reached payment — stopped by design" (#10) appears only in the scripted tests so far.
 - Anthropic and OpenAI defaults are untested (no keys). The CI workflow has no manual real-AI job yet (planned with M8).
-- `CLAUDE.md` still says "Node ≥ 20" (carried over from M0).
+- ~~`CLAUDE.md` still says "Node ≥ 20".~~ Fixed 2026-11-14.
+
+---
+
+## M4 follow-ups (owner decisions of 2026-11-14)
+
+- **Status:** done
+- **Commit:** recorded below after committing
+- **Pushed:** —
+
+**What was built**
+
+1. **Broken link severity by placement.** Page facts now record each link's text, whether it sits in the header/main menu, and whether it looks like a button. Major: menu links and primary calls-to-action. Minor: other links (`links/broken-other-link`). Unit tests cover both, and the e2e run proves the header "Pricing" link stays Major.
+2. **Node check at startup.** `src/cli.ts` checks the version before loading anything else. Verified on a real Node 20.17 (friendly how-to, exit code 2), plus unit tests and an e2e test with a faked old version. `CLAUDE.md` and SPEC §8 now say Node ≥ 22.12.
+3. **ShipCheck's blocking is never an app bug.** Blocked requests are tagged; the app's error messages caused by a block are matched (`src/checks/blocked.ts`) and left out of all findings; "What we couldn't test" lists what was blocked. Fixture: a payment-script stand-in on the home page. The tests prove the separation matters: without it, the same run _would_ report a console-error finding and a second crash.
+4. **A refused valid login is still reported.** The fixture's `rejectAllLogins` switch: "Users cannot log in" (Blocker) is reported, the server saw both attempts answered with 401.
+
+**Found on the way, fixed (builder's calls, in SPEC §13)**
+
+- The new fixture case first **hid the broken login**: the login flow stopped at once with "Reached payment — stopped by design", because the payment script's invisible frame counted as a payment step. Stripe.js does the same on every page of real apps. Now only visible payment frames count.
+- For the same reason, a payment script's background requests no longer end a flow (they are still blocked).
+
+**CI:** every run on GitHub is green, including `1d133b8`.
+
+**Open questions**
+
+- The new real-AI assertion for the payment widget was added after the one `npm run test:ai` run the owner approved, so it has not run against the real AI yet. The scripted e2e tests cover the same behaviour.
 
 ---
 

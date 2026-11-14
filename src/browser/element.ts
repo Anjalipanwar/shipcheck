@@ -79,7 +79,16 @@ const PAYMENT_SCRIPT = `(() => {
     'input[id*="cardnumber" i],input[id*="card-number" i],input[id*="card_number" i],' +
     'input[name="cvc" i],input[name="cvv" i]')].filter(visible);
   if (fields.length > 0) return 'card';
-  const frames = [...document.querySelectorAll('iframe')].map((frame) => frame.src || frame.name);
+  // Only frames a visitor can see. Payment scripts such as Stripe.js add an invisible frame to
+  // every page (for fraud checks); that is not a payment step.
+  const seen = (node) => {
+    const box = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    return box.width >= 20 && box.height >= 20 &&
+      style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) > 0;
+  };
+  const frames = [...document.querySelectorAll('iframe')].filter(seen)
+    .map((frame) => frame.src || frame.name);
   return { frames, widget: document.querySelector(
     '.StripeElement,paypal-buttons,[data-paypal-button]') !== null };
 })()`;
@@ -117,16 +126,12 @@ function isPaymentAddress(value: string): boolean {
 }
 
 /**
- * Looks for signs of a payment step on the page (SPEC §7.2): card fields, or embedded payment
- * frames and buttons. Returns a short plain-English description, or null if there are none.
+ * Looks for signs of a payment step on the page (SPEC §7.2): card fields, or visible embedded
+ * payment frames and buttons. Invisible provider frames do not count (they are on every page of
+ * apps that load Stripe.js everywhere); the backstop blocks their traffic either way. Returns a short plain-English description, or null if there are none.
  */
 export async function detectPayment(page: Page): Promise<string | null> {
   try {
-    if (
-      page.frames().some((frame) => frame !== page.mainFrame() && isPaymentAddress(frame.url()))
-    ) {
-      return 'an embedded payment form';
-    }
     const found = PaymentSchema.safeParse(await page.evaluate(PAYMENT_SCRIPT));
     if (!found.success) return null;
     if (found.data === 'card') return 'a card number field';

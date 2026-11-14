@@ -6,6 +6,7 @@ import { Evidence, type Screenshot } from './browser/evidence.js';
 import { isRiskyUrl } from './browser/guard.js';
 import { BrowserSession, gotoWithRetry, type DevicePage } from './browser/session.js';
 import { checkA11y, runAxe, type A11yViolation } from './checks/a11y.js';
+import { describeBlocking, separateShipCheckBlocking } from './checks/blocked.js';
 import {
   collectPageFacts,
   collectTimings,
@@ -247,12 +248,14 @@ export async function runShipCheck(
       // One more page, so links, images, scripts and accessibility are not judged on the
       // home page alone (SPEC §6.2). Only a safe link on the same site is followed.
       const renderedHtml = await desktop.page.content().catch(() => '');
-      const second = facts.links.find(
-        (link) =>
-          session.lock.isAllowed(link) &&
-          !isRiskyUrl(link) &&
-          new URL(link).pathname !== new URL(finalUrl).pathname,
-      );
+      const second = facts.links
+        .map((link) => link.href)
+        .find(
+          (link) =>
+            session.lock.isAllowed(link) &&
+            !isRiskyUrl(link) &&
+            new URL(link).pathname !== new URL(finalUrl).pathname,
+        );
       let secondHtml = '';
       if (second && Date.now() < deadline) {
         try {
@@ -366,30 +369,14 @@ export async function runShipCheck(
       }
     }
 
-    // Last, because it looks at everything that happened during the run.
-    await step('Hidden errors', () => checkErrors(evidence.events));
+    // Last, because it looks at everything that happened during the run. Errors caused by
+    // ShipCheck's own blocking are taken out first: they are never the app's fault.
+    await step('Hidden errors', () => checkErrors(separateShipCheckBlocking(evidence.events).app));
   } finally {
     await ai?.close();
     await session.close();
   }
 
-  const blockedSites = [
-    ...new Set(
-      evidence.events.flatMap((e) => {
-        if (e.kind !== 'blocked-navigation') return [];
-        try {
-          return [new URL(e.url).host];
-        } catch {
-          return [];
-        }
-      }),
-    ),
-  ];
-  if (blockedSites.length > 0) {
-    collector.notTested.push(
-      `Pages on other websites (${blockedSites.join(', ')}) — ShipCheck only tests the app you asked for`,
-    );
-  }
   if (config.noAi) {
     collector.notTested.push(
       'Signing up, logging in, the main feature, forms and the phone-sized pass — these need an AI key (this run used --no-ai)',
@@ -405,18 +392,9 @@ export async function runShipCheck(
     }
     collector.notTested.push('The phone-sized pass — not part of this version yet');
   }
-  const stopped = [
-    ...new Set(
-      evidence.events.flatMap((e) =>
-        e.kind === 'blocked-request' ? [`${e.reason} (${e.method} ${e.url.split('?')[0]})`] : [],
-      ),
-    ),
-  ];
-  if (stopped.length > 0) {
-    collector.notTested.push(
-      `Stopped by design — ShipCheck’s safety net blocked ${stopped.slice(0, 5).join('; ')}`,
-    );
-  }
+  collector.notTested.push(
+    ...describeBlocking(evidence.events, separateShipCheckBlocking(evidence.events).ours.length),
+  );
   const llm = useAi ? budget.summary() : undefined;
 
   const findings = rankFindings(collector.findings);

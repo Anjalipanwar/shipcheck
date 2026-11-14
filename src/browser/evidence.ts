@@ -1,5 +1,6 @@
-import type { BrowserContext, Page } from 'playwright';
+import type { BrowserContext, Page, Request } from 'playwright';
 import type { ActionLogEntry } from '../report/schema.js';
+import type { BackstopReason } from './backstop.js';
 import type { DeviceName } from './devices.js';
 
 export type EvidenceEvent = {
@@ -12,11 +13,28 @@ export type EvidenceEvent = {
 } & (
   | { kind: 'console-error'; text: string }
   | { kind: 'page-error'; text: string }
-  | { kind: 'request-failed'; url: string; method: string; resourceType: string; text: string }
+  | {
+      kind: 'request-failed';
+      url: string;
+      method: string;
+      resourceType: string;
+      text: string;
+      /** Set when ShipCheck itself stopped the request (it is then never an app bug). */
+      blockedBy?: 'shipcheck';
+    }
   | { kind: 'bad-response'; url: string; method: string; resourceType: string; status: number }
   | { kind: 'insecure-request'; url: string; resourceType: string }
   | { kind: 'blocked-navigation'; url: string }
-  | { kind: 'blocked-request'; url: string; method: string; reason: string }
+  | {
+      kind: 'blocked-request';
+      url: string;
+      method: string;
+      /** Plain-English reason, used in messages. */
+      reason: string;
+      cause: BackstopReason;
+      /** The request would have opened a new page in the main window (not a background call). */
+      topLevel: boolean;
+    }
   | { kind: 'write-response'; url: string; method: string; status: number }
   | { kind: 'dialog'; text: string; dialogType: string }
 );
@@ -56,6 +74,8 @@ export class Evidence {
   readonly screenshots: Screenshot[] = [];
   readonly actionLog: ActionLogEntry[] = [];
   private readonly secrets = new Set<string>();
+  /** Requests ShipCheck stopped on purpose, so their failure is tagged as ours. */
+  private readonly blocked = new WeakSet<Request>();
   private scope: string | undefined;
 
   /** Registers a value (password, API key) that must never appear in logs or reports. */
@@ -97,8 +117,16 @@ export class Evidence {
   recordBlockedRequest(
     device: DeviceName,
     pageUrl: string,
-    request: { url: string; method: string; reason: string },
+    request: {
+      url: string;
+      method: string;
+      reason: string;
+      cause: BackstopReason;
+      topLevel: boolean;
+    },
+    browserRequest?: Request,
   ): void {
+    if (browserRequest) this.blocked.add(browserRequest);
     this.push(device, pageUrl, { kind: 'blocked-request', ...request });
   }
 
@@ -132,6 +160,7 @@ export class Evidence {
           method: request.method(),
           resourceType: request.resourceType(),
           text: request.failure()?.errorText ?? 'failed',
+          ...(this.blocked.has(request) ? { blockedBy: 'shipcheck' } : {}),
         });
       });
       page.on('request', (request) => {

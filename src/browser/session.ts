@@ -119,12 +119,19 @@ export class BrowserSession {
       this.evidence.recordBlockedNavigation(device.name, pageUrl, url),
     );
     // Added after the domain lock, so it is asked first: nothing gets past the backstop.
-    await installBackstop(context, (reason, request, pageUrl) =>
-      this.evidence.recordBlockedRequest(device.name, pageUrl, {
-        url: request.url,
-        method: request.method,
-        reason: BACKSTOP_REASON_TEXT[reason],
-      }),
+    await installBackstop(context, (reason, request, pageUrl, browserRequest) =>
+      this.evidence.recordBlockedRequest(
+        device.name,
+        pageUrl,
+        {
+          url: request.url,
+          method: request.method,
+          reason: BACKSTOP_REASON_TEXT[reason],
+          cause: reason,
+          topLevel: request.topLevel,
+        },
+        browserRequest,
+      ),
     );
     this.evidence.attach(context, device.name);
     const page = await context.newPage();

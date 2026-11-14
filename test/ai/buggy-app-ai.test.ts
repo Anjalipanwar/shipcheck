@@ -83,6 +83,12 @@ describe.skipIf(!model)('real AI run against buggy-app (M4 acceptance)', () => {
     expect(fromFlows.map((f) => f.rule)).toEqual(['login/no-error-on-wrong-password']);
   });
 
+  it('payment script on the home page: blocked by design, never reported as an app bug', () => {
+    expect(report.notTested.join('\n')).toMatch(/Payment requests were blocked by design/);
+    const others = report.findings.filter((f) => f.rule !== 'secrets/stripe-secret-key');
+    expect(JSON.stringify(others)).not.toMatch(/stripe|PayWidget|Failed to fetch/i);
+  });
+
   it('stays within the AI call budget and reports the count per flow', () => {
     expect(result.llm?.total).toBeGreaterThan(0);
     expect(result.llm?.total).toBeLessThanOrEqual(150);

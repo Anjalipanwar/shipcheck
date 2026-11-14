@@ -107,7 +107,7 @@ describe('report.html from a real run', () => {
     expect(await page.locator('article.card').count()).toBe(8);
     expect(await page.locator('ol.first a').allInnerTexts()).toEqual([
       'A secret key is visible to anyone who visits your app (Stripe secret key)',
-      'A link in your app leads to a page that does not exist',
+      'The “Pricing” link in your main menu leads to a page that does not exist',
       '4 recommended security settings are switched off',
     ]);
     expect(await page.locator('main h3').allInnerTexts()).toEqual([

@@ -199,7 +199,7 @@ export class FlowContext {
       return { status: 'blocked', facts, reason: verdict.reason };
     }
 
-    const blockedBefore = this.evidence.count('blocked-request');
+    const stopsBefore = this.blockedActions();
     let outcome: { success: boolean; message: string };
     try {
       outcome = await this.deps.ai.act(this.page, action);
@@ -213,8 +213,8 @@ export class FlowContext {
       ...(outcome.success ? {} : { detail: outcome.message.split('\n')[0] ?? 'failed' }),
     });
 
-    if (this.evidence.count('blocked-request') > blockedBefore) {
-      const blocked = this.evidence.events.filter((e) => e.kind === 'blocked-request').at(-1);
+    if (this.blockedActions().length > stopsBefore.length) {
+      const blocked = this.blockedActions().at(-1);
       throw new StopFlow(
         'blocked-request',
         `${FLOW_LABEL[this.flow]} — stopped by design: the last step tried to send ${
@@ -228,6 +228,19 @@ export class FlowContext {
     return outcome.success
       ? { status: 'ok', facts }
       : { status: 'failed', facts, message: outcome.message };
+  }
+
+  /**
+   * Blocked requests that mean "this step tried to do something not allowed" and so end the
+   * flow: deletes, card numbers, and opening a payment provider's page. A payment script
+   * phoning home in the background (Stripe.js does this on every page) is still blocked, but
+   * it is not the step's doing, so the flow carries on.
+   */
+  private blockedActions() {
+    return this.evidence.events.filter(
+      (e): e is Extract<typeof e, { kind: 'blocked-request' }> =>
+        e.kind === 'blocked-request' && (e.cause !== 'payment-host' || e.topLevel),
+    );
   }
 
   /** Waits for the page to calm down after an action (never longer than a few seconds). */

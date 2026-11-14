@@ -2,7 +2,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { LlmBudget } from '../../src/ai/budget.js';
 import { DESKTOP } from '../../src/browser/devices.js';
 import { Evidence } from '../../src/browser/evidence.js';
+import { detectPayment } from '../../src/browser/element.js';
 import { BrowserSession, type DevicePage } from '../../src/browser/session.js';
+import { separateShipCheckBlocking } from '../../src/checks/blocked.js';
+import { checkErrors } from '../../src/checks/errors.js';
 import { loadConfig } from '../../src/config.js';
 import { StopFlow, runFlow } from '../../src/flows/context.js';
 import type { FlowDeps } from '../../src/flows/types.js';
@@ -86,7 +89,7 @@ describe('backstop alone — no guard, no flow logic, just a browser that clicks
 
   it('requests to a payment provider are stopped inside the browser', async () => {
     const { page } = desktop;
-    await page.goto(`${app.url}/`);
+    await page.goto(`${app.url}/contact.html`); // a page without the fixture's payment widget
     const outcome = await page.evaluate(() =>
       fetch('https://api.stripe.com/v1/payment_intents', {
         method: 'POST',
@@ -98,6 +101,74 @@ describe('backstop alone — no guard, no flow logic, just a browser that clicks
     );
     expect(outcome).toBe('stopped');
     expect(blocked()).toEqual(['POST /v1/payment_intents: a request to a payment provider']);
+  });
+
+  it('a payment script’s blocked requests are tagged as ShipCheck’s, and its errors are not app bugs', async () => {
+    const { page } = desktop;
+    await page.goto(`${app.url}/`); // loads the fixture's payment widget
+    await expect
+      .poll(() => evidence.events.filter((e) => e.kind === 'request-failed').length)
+      .toBeGreaterThanOrEqual(3);
+    await page.waitForTimeout(500);
+
+    const payment = evidence.events.filter(
+      (e) => e.kind === 'blocked-request' && e.cause === 'payment-host',
+    );
+    expect(
+      payment.map((e) => (e.kind === 'blocked-request' ? new URL(e.url).hostname : '')).sort(),
+    ).toEqual(['api.stripe.com', 'js.stripe.com', 'r.stripe.com']);
+    expect(payment.every((e) => e.kind === 'blocked-request' && !e.topLevel)).toBe(true);
+
+    // Every failed request to Stripe carries the tag; nothing else does.
+    const failed = evidence.events.flatMap((e) => (e.kind === 'request-failed' ? [e] : []));
+    for (const event of failed) {
+      expect(event.blockedBy, event.url).toBe(
+        new URL(event.url).hostname.endsWith('stripe.com') ? 'shipcheck' : undefined,
+      );
+    }
+
+    // The widget's console error and its uncaught "Failed to fetch" are recognised as ours…
+    const { app: appEvents, ours } = separateShipCheckBlocking(evidence.events);
+    const ourTexts = ours.flatMap((e) =>
+      e.kind === 'console-error' || e.kind === 'page-error' ? [e.text] : [],
+    );
+    expect(ourTexts.join('\n')).toMatch(/PayWidget: could not reach r\.stripe\.com/);
+    expect(ourTexts.join('\n')).toMatch(/Failed to fetch/);
+    // Without this separation the same events WOULD give false findings (so this test can fail):
+    const unfiltered = checkErrors(evidence.events).findings;
+    expect(unfiltered.map((f) => f.rule)).toContain('errors/console-errors');
+    expect(
+      unfiltered.find((f) => f.rule === 'errors/uncaught-exception')?.evidence.logs,
+    ).toHaveLength(2);
+    // …while planted bug #3 on the same page is still reported, and nothing else is.
+    const findings = checkErrors(appEvents).findings;
+    expect(findings.map((f) => f.rule)).toEqual(['errors/uncaught-exception']);
+    expect(findings[0]?.evidence.logs).toHaveLength(1);
+    expect(findings[0]?.evidence.logs?.join(' ')).toMatch(/track/);
+  });
+
+  it('an invisible payment-provider frame is not a payment step; a visible one is', async () => {
+    const { page } = desktop;
+    await page.goto(`${app.url}/contact.html`);
+    // Like Stripe.js on every page: hidden frames (all their requests are blocked anyway).
+    await page.evaluate(() => {
+      const hidden = document.createElement('iframe');
+      hidden.src = 'https://js.stripe.com/v3/controller.html';
+      hidden.hidden = true;
+      const tiny = document.createElement('iframe');
+      tiny.src = 'https://m.stripe.network/inner.html';
+      tiny.setAttribute('style', 'width:1px;height:1px;visibility:hidden;position:fixed');
+      document.body.append(hidden, tiny);
+    });
+    expect(await detectPayment(page)).toBeNull();
+    // A card form a visitor can see.
+    await page.evaluate(() => {
+      const card = document.createElement('iframe');
+      card.src = 'https://js.stripe.com/v3/elements-inner-card.html';
+      card.setAttribute('style', 'width:300px;height:50px');
+      document.body.append(card);
+    });
+    expect(await detectPayment(page)).toBe('an embedded payment form');
   });
 
   it('"Are you sure?" boxes are always answered with No, and alerts do not hang the run', async () => {

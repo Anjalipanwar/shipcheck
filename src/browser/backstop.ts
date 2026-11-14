@@ -1,4 +1,4 @@
-import type { BrowserContext } from 'playwright';
+import type { BrowserContext, Request } from 'playwright';
 import { containsCardNumber } from './cards.js';
 
 /**
@@ -128,7 +128,12 @@ export function decideRequest(request: RequestFacts): BackstopReason | null {
 /** Installs the backstop on a browser context. Blocked requests are aborted inside the browser. */
 export async function installBackstop(
   context: BrowserContext,
-  onBlocked: (reason: BackstopReason, request: RequestFacts, pageUrl: string) => void,
+  onBlocked: (
+    reason: BackstopReason,
+    request: RequestFacts & { topLevel: boolean },
+    pageUrl: string,
+    browserRequest: Request,
+  ) => void,
 ): Promise<void> {
   await context.route('**/*', async (route) => {
     const request = route.request();
@@ -152,12 +157,15 @@ export async function installBackstop(
       return;
     }
     let pageUrl = '';
+    let topLevel = request.isNavigationRequest();
     try {
-      pageUrl = request.frame().page().url();
+      const frame = request.frame();
+      topLevel = topLevel && frame.parentFrame() === null;
+      pageUrl = frame.page().url();
     } catch {
       // No page yet (brand-new tab); the request is blocked all the same.
     }
-    onBlocked(reason, facts, pageUrl);
+    onBlocked(reason, { ...facts, topLevel }, pageUrl, request);
     await route.abort('blockedbyclient');
   });
 }

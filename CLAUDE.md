@@ -21,6 +21,6 @@ ShipCheck is an open-source CLI + GitHub Action: an AI agent uses a vibe-coded w
 - Keep the maintainer cost at €0: no hosted services, no required paid APIs; users bring their own AI key.
 
 ## Conventions
-- TypeScript strict, ESM, Node ≥ 20. Small modules per SPEC §8 layout. zod for all external input.
+- TypeScript strict, ESM, Node ≥ 22.12 (checked at startup by `src/node-version.ts`). Small modules per SPEC §8 layout. zod for all external input.
 - All LLM prompts live in `src/ai/prompts.ts`. All model defaults in `src/ai/models.ts`.
 - Testing against real third-party websites is not allowed in automated tests — use `test/fixtures/buggy-app`.

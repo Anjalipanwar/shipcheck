@@ -124,11 +124,20 @@ async function serveStatic(urlPath: string, res: ServerResponse): Promise<void> 
   send(res, 404, CONTENT_TYPES['.html'] as string, notFound);
 }
 
+export interface FixtureOptions {
+  /**
+   * Breaks logging in: the server answers every log-in, even with the right password, with
+   * 401. Used to prove that a refused log-in is still reported, although refused submissions
+   * are not counted as failed background requests.
+   */
+  rejectAllLogins?: boolean;
+}
+
 /**
  * Starts the buggy fixture app on a random free port, bound to localhost only.
  * Each call gets its own counters and its own in-memory accounts.
  */
-export async function startFixtureServer(): Promise<FixtureServer> {
+export async function startFixtureServer(options: FixtureOptions = {}): Promise<FixtureServer> {
   const hits: FixtureHits = {
     deleteAccount: 0,
     checkoutSubmit: 0,
@@ -172,7 +181,8 @@ export async function startFixtureServer(): Promise<FixtureServer> {
       case '/api/login': {
         hits.login += 1;
         const email = text(body.email).trim().toLowerCase();
-        if (accounts.get(email) === text(body.password) && accounts.has(email)) {
+        const valid = accounts.get(email) === text(body.password) && accounts.has(email);
+        if (valid && !options.rejectAllLogins) {
           return sendJson(res, 200, { ok: true });
         }
         hits.loginFailed += 1;

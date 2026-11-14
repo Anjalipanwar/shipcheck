@@ -28,8 +28,24 @@ afterAll(async () => {
   await app.close();
 });
 
+/**
+ * Every browser in this file talks to the local fixture only. The fixture's payment widget
+ * points at Stripe's addresses; without this, a plain browser would really contact them.
+ */
+const outsideRequests: string[] = [];
+async function newContext(options: Parameters<Browser['newContext']>[0]): Promise<BrowserContext> {
+  const created = await browser.newContext(options);
+  await created.route('**/*', async (route) => {
+    const { hostname } = new URL(route.request().url());
+    if (hostname === '127.0.0.1') return route.fallback();
+    outsideRequests.push(route.request().url());
+    return route.abort('blockedbyclient');
+  });
+  return created;
+}
+
 async function open(path: string, viewport: { width: number; height: number }): Promise<Page> {
-  context = await browser.newContext({ viewport, hasTouch: viewport === PHONE });
+  context = await newContext({ viewport, hasTouch: viewport === PHONE });
   const page = await context.newPage();
   await page.goto(app.url + path, { waitUntil: 'load' });
   return page;
@@ -88,17 +104,46 @@ describe('buggy-app in a real browser', () => {
   });
 
   it('#3 landing page throws an uncaught error on load; other pages do not', async () => {
-    context = await browser.newContext({ viewport: DESKTOP });
+    context = await newContext({ viewport: DESKTOP });
     const page = await context.newPage();
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
     await page.goto(`${app.url}/`, { waitUntil: 'load' });
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/track|analytics|undefined/);
+    await page.waitForTimeout(300);
+    // The payment widget's unhandled "Failed to fetch" (its request is refused here) is not
+    // part of bug #3; see the payment widget test below.
+    const own = errors.filter((text) => !/failed to fetch/i.test(text));
+    expect(own).toHaveLength(1);
+    expect(own[0]).toMatch(/track|analytics|undefined/);
 
     await page.goto(`${app.url}/contact.html`, { waitUntil: 'load' });
-    expect(errors).toHaveLength(1);
+    expect(errors.filter((text) => !/failed to fetch/i.test(text))).toHaveLength(1);
+  });
+
+  it('payment widget (works on purpose): on load it contacts Stripe’s addresses, and only those', async () => {
+    outsideRequests.length = 0;
+    context = await newContext({ viewport: DESKTOP });
+    const page = await context.newPage();
+    const consoleErrors: string[] = [];
+    const crashes: string[] = [];
+    page.on('console', (m) => void (m.type() === 'error' && consoleErrors.push(m.text())));
+    page.on('pageerror', (error) => crashes.push(error.message));
+    await page.goto(`${app.url}/`, { waitUntil: 'load' });
+    await expect.poll(() => outsideRequests.length).toBe(3);
+    expect(outsideRequests.map((url) => new URL(url).hostname).sort()).toEqual([
+      'api.stripe.com',
+      'js.stripe.com',
+      'r.stripe.com',
+    ]);
+    expect(app.requests).toContain('GET /assets/pay-widget.js');
+    // Its own reactions to the refused requests, which ShipCheck must not report:
+    await expect
+      .poll(() =>
+        consoleErrors.some((t) => t.startsWith('PayWidget: could not reach r.stripe.com')),
+      )
+      .toBe(true);
+    await expect.poll(() => crashes.some((t) => /failed to fetch/i.test(t))).toBe(true);
   });
 
   it('#7 wrong password shows no message; the right password logs in', async () => {
@@ -143,7 +188,7 @@ describe('buggy-app in a real browser', () => {
     // A separate server so these deliberate clicks never pollute other counters.
     const trap = await startFixtureServer();
     try {
-      context = await browser.newContext({ viewport: DESKTOP });
+      context = await newContext({ viewport: DESKTOP });
       const page = await context.newPage();
 
       await page.goto(`${trap.url}/account.html`);

@@ -1,5 +1,6 @@
 import { PROMPTS } from '../ai/prompts.js';
 import { isRiskyUrl } from '../browser/guard.js';
+import { causedByShipCheck } from '../checks/blocked.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
 import { click, fill, readFields, type Field } from './fields.js';
 
@@ -86,7 +87,9 @@ async function submit(
       e.kind === 'write-response' && e.status < 400 ? [`${e.method} ${e.url} → ${e.status}`] : [],
     ),
     message: FlowContext.newText(before, after),
-    crashed: fresh.some((e) => e.kind === 'page-error'),
+    crashed: fresh.some(
+      (e) => e.kind === 'page-error' && !causedByShipCheck(e, ctx.evidence.events),
+    ),
     blocked: held,
   };
 }
@@ -206,7 +209,9 @@ export const formsFlow: FlowBody = async (ctx) => {
         ],
         screenshots: shot ? [shot] : [],
         logs: ctx.evidence.events
-          .flatMap((e) => (e.kind === 'page-error' ? [e.text] : []))
+          .flatMap((e) =>
+            e.kind === 'page-error' && !causedByShipCheck(e, ctx.evidence.events) ? [e.text] : [],
+          )
           .slice(-3),
         fixPrompt: `The form on ${url} throws a JavaScript error when a field contains 5,000 characters, emoji or accented letters. Please handle such input safely and add sensible length limits.`,
         confidence: 'verified',

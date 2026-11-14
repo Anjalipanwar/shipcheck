@@ -1,19 +1,56 @@
 import type { DomainLock } from '../browser/domain.js';
 import { isRiskyUrl } from '../browser/guard.js';
 import { makeFinding, type Finding } from '../report/schema.js';
-import type { PageFacts } from './collect.js';
+import type { PageFacts, PageLink } from './collect.js';
 import type { CheckResult } from './types.js';
 
 /** SPEC §6.2: at most 50 links/images are checked. */
 export const MAX_LINK_CHECKS = 50;
 const CONCURRENCY = 5;
 
+/**
+ * Where a link sits, which sets how bad it is when broken (owner decision, 2026-11-14):
+ * `navigation` (page header / main menu) and `call-to-action` (sign up, log in, checkout or a
+ * link styled as the page's main button) are Major; `other` links are Minor.
+ */
+export type LinkPlacement = 'navigation' | 'call-to-action' | 'other';
+
 export interface LinkTarget {
   url: string;
   kind: 'link' | 'image';
   /** The page it was found on. */
   foundOn: string;
+  /** Links only: the most prominent place the address was found in. */
+  placement?: LinkPlacement;
+  /** Links only: the link's visible text at that place. */
+  text?: string;
 }
+
+/** Words that make a link a primary call-to-action, in its text or its address. */
+const CTA_TEXT =
+  /\b(sign[\s-]?up|register|create (an |your )?account|get started|start (for )?free|try (it )?(for )?free|join( now| free)?|log[\s-]?in|sign[\s-]?in|check[\s-]?out|buy( now)?|subscribe|upgrade|registrieren|anmelden|einloggen|kasse|jetzt kaufen)\b/i;
+const CTA_PATH =
+  /(^|\/)(sign[-_]?up|register|registration|join|log[-_]?in|sign[-_]?in|checkout|get[-_]?started|subscribe)(\/|\.|$)/i;
+
+/** Decides how prominent a link is. Pure, so it can be unit-tested without a browser. */
+export function linkPlacement(
+  link: Pick<PageLink, 'href' | 'text' | 'inNavigation' | 'looksLikeButton'>,
+): LinkPlacement {
+  if (link.inNavigation) return 'navigation';
+  if (link.looksLikeButton || CTA_TEXT.test(link.text)) return 'call-to-action';
+  try {
+    if (CTA_PATH.test(new URL(link.href).pathname)) return 'call-to-action';
+  } catch {
+    // Not a valid address — treated as an ordinary link.
+  }
+  return 'other';
+}
+
+const PLACEMENT_RANK: Record<LinkPlacement, number> = {
+  navigation: 2,
+  'call-to-action': 1,
+  other: 0,
+};
 
 export interface LinkSelection {
   targets: LinkTarget[];
@@ -38,9 +75,10 @@ export function selectLinkTargets(
 ): LinkSelection {
   const seen = new Set<string>();
   const candidates: LinkTarget[] = [];
+  const byUrl = new Map<string, LinkTarget>();
   let skippedForSafety = 0;
 
-  const consider = (raw: string, kind: LinkTarget['kind'], foundOn: string) => {
+  const consider = (raw: string, kind: LinkTarget['kind'], foundOn: string, link?: PageLink) => {
     let url: string;
     try {
       if (!/^https?:/i.test(raw)) return;
@@ -48,19 +86,38 @@ export function selectLinkTargets(
     } catch {
       return;
     }
-    if (!lock.isAllowed(url) || seen.has(url)) return;
+    if (!lock.isAllowed(url)) return;
+    const placement = link ? linkPlacement(link) : undefined;
+    const known = byUrl.get(url);
+    if (known && placement && known.kind === 'link') {
+      // The same address in a more prominent place (e.g. a body link that is also in the menu)
+      // takes that place, so a broken menu link is never downgraded by an earlier body link.
+      if (PLACEMENT_RANK[placement] > PLACEMENT_RANK[known.placement ?? 'other']) {
+        Object.assign(known, { placement, foundOn, ...(link?.text ? { text: link.text } : {}) });
+      }
+      return;
+    }
+    if (seen.has(url)) return;
     seen.add(url);
     if (kind === 'link' && isRiskyUrl(url)) {
       skippedForSafety += 1;
       return;
     }
-    candidates.push({ url, kind, foundOn });
+    const target: LinkTarget = {
+      url,
+      kind,
+      foundOn,
+      ...(placement ? { placement } : {}),
+      ...(link?.text ? { text: link.text } : {}),
+    };
+    byUrl.set(url, target);
+    candidates.push(target);
   };
 
   for (const page of pages) {
     seen.add(withoutHash(page.url));
     for (const image of page.images) consider(image.src, 'image', page.url);
-    for (const link of page.links) consider(link, 'link', page.url);
+    for (const link of page.links) consider(link.href, 'link', page.url, link);
   }
 
   return {
@@ -108,42 +165,13 @@ export async function checkLinks(
 
   const findings: Finding[] = [];
   const describe = (b: { target: LinkTarget; status: number }) =>
-    `${b.status === 0 ? 'no answer' : b.status} ${b.target.url} — found on ${b.target.foundOn}`;
+    `${b.status === 0 ? 'no answer' : b.status} ${b.target.url}${placeText(b.target)} — found on ${b.target.foundOn}`;
 
   const brokenLinks = broken.filter((b) => b.target.kind === 'link');
-  const first = brokenLinks[0];
-  if (first) {
-    findings.push(
-      makeFinding({
-        rule: 'links/broken-link',
-        title:
-          brokenLinks.length === 1
-            ? 'A link in your app leads to a page that does not exist'
-            : `${brokenLinks.length} links in your app lead to pages that do not exist`,
-        severity: 'major',
-        category: 'functional',
-        device: 'both',
-        whatHappened: `${brokenLinks.length === 1 ? 'One link points' : `${brokenLinks.length} links point`} to an address that answers with “not found” or an error.`,
-        whyItMatters:
-          'Visitors who click it hit a dead end, which makes the app feel unfinished and can lose them at exactly the moment they were interested.',
-        stepsToReproduce: [
-          `Open ${first.target.foundOn}.`,
-          `Click the link that goes to ${first.target.url}.`,
-          'An error page appears instead of the expected page.',
-        ],
-        evidence: {
-          screenshots: [],
-          logs: brokenLinks.slice(0, 10).map(describe),
-          url: first.target.foundOn,
-        },
-        fixPrompt: `These links in my app are broken. For each one, either create the missing page, point the link to the right address, or remove the link:\n${brokenLinks
-          .slice(0, 10)
-          .map((b) => `- ${b.target.url} (linked from ${b.target.foundOn})`)
-          .join('\n')}`,
-        confidence: 'verified',
-      }),
-    );
-  }
+  const key = brokenLinks.filter((b) => b.target.placement && b.target.placement !== 'other');
+  const other = brokenLinks.filter((b) => !b.target.placement || b.target.placement === 'other');
+  if (key.length > 0) findings.push(brokenLinkFinding(key, 'key', describe));
+  if (other.length > 0) findings.push(brokenLinkFinding(other, 'other', describe));
 
   const brokenImages = broken.filter((b) => b.target.kind === 'image');
   const firstImage = brokenImages[0];
@@ -198,4 +226,64 @@ export async function checkLinks(
     passed: checkedOk > 0 ? [`${checkedOk} links and images on your own site work`] : [],
     notTested,
   };
+}
+
+function placeText(target: LinkTarget): string {
+  const label = target.text ? `“${target.text}”` : 'a link';
+  if (target.placement === 'navigation') return ` (${label} in the page header or main menu)`;
+  if (target.placement === 'call-to-action')
+    return ` (${label}, a main button or sign-up/log-in link)`;
+  return target.text ? ` (${label})` : '';
+}
+
+function keyTitle(group: { target: LinkTarget }[]): string {
+  const allMenu = group.every((b) => b.target.placement === 'navigation');
+  const allCta = group.every((b) => b.target.placement === 'call-to-action');
+  if (group.length === 1) {
+    const text = group[0]?.target.text ? ` “${group[0].target.text}”` : '';
+    if (allMenu) return `The${text} link in your main menu leads to a page that does not exist`;
+    return `Your main button${text} leads to a page that does not exist`;
+  }
+  if (allMenu) return `${group.length} links in your main menu lead to pages that do not exist`;
+  if (allCta) return `${group.length} of your main buttons lead to pages that do not exist`;
+  return `${group.length} links in your main menu or main buttons lead to pages that do not exist`;
+}
+
+function brokenLinkFinding(
+  group: { target: LinkTarget; status: number }[],
+  kind: 'key' | 'other',
+  describe: (b: { target: LinkTarget; status: number }) => string,
+): Finding {
+  const first = group[0] as { target: LinkTarget; status: number };
+  const isKey = kind === 'key';
+  return makeFinding({
+    rule: isKey ? 'links/broken-link' : 'links/broken-other-link',
+    title: isKey
+      ? keyTitle(group)
+      : group.length === 1
+        ? 'A link in your app leads to a page that does not exist'
+        : `${group.length} links in your app lead to pages that do not exist`,
+    severity: isKey ? 'major' : 'minor',
+    category: 'functional',
+    device: 'both',
+    whatHappened: `${group.length === 1 ? 'One link points' : `${group.length} links point`} to an address that answers with “not found” or an error.${isKey ? ' It sits where almost every visitor looks: the page header, the main menu or a main button.' : ''}`,
+    whyItMatters: isKey
+      ? 'Visitors use the menu and the main buttons to find their way around and to sign up. A dead end there loses them at exactly the moment they were interested.'
+      : 'Visitors who click it hit a dead end, which makes the app feel unfinished.',
+    stepsToReproduce: [
+      `Open ${first.target.foundOn}.`,
+      `Click ${first.target.text ? `the link “${first.target.text}”` : 'the link'} that goes to ${first.target.url}.`,
+      'An error page appears instead of the expected page.',
+    ],
+    evidence: {
+      screenshots: [],
+      logs: group.slice(0, 10).map(describe),
+      url: first.target.foundOn,
+    },
+    fixPrompt: `These links in my app are broken. For each one, either create the missing page, point the link to the right address, or remove the link:\n${group
+      .slice(0, 10)
+      .map((b) => `- ${b.target.url}${placeText(b.target)} (linked from ${b.target.foundOn})`)
+      .join('\n')}`,
+    confidence: 'verified',
+  });
 }

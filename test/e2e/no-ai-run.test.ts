@@ -121,6 +121,38 @@ describe('expected extras and nothing else', () => {
     );
   });
 
+  it('payment script on the home page: blocked by design, listed as not tested, no false finding', () => {
+    expect(app.requests).toContain('GET /assets/pay-widget.js');
+    const payment = report.notTested.find((line) => line.startsWith('Payment requests'));
+    expect(payment).toMatch(
+      /^Payment requests were blocked by design \(to .+\), so paying was not tested$/,
+    );
+    for (const host of ['js.stripe.com', 'r.stripe.com', 'api.stripe.com']) {
+      expect(payment).toContain(host);
+    }
+    expect(report.notTested).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(
+          /^\d+ error messages and failed requests were caused by this blocking and are not counted as problems in your app$/,
+        ),
+      ]),
+    );
+    // Bug #6 (the exposed Stripe secret key) rightly names Stripe; nothing else may.
+    const findingsText = JSON.stringify(
+      report.findings.filter((f) => f.rule !== 'secrets/stripe-secret-key'),
+    );
+    expect(findingsText).not.toMatch(/stripe|PayWidget|Failed to fetch/i);
+  });
+
+  it('broken link severity follows placement: the header “Pricing” link stays Major', () => {
+    const link = only('links/broken-link');
+    expect(link.title).toBe(
+      'The “Pricing” link in your main menu leads to a page that does not exist',
+    );
+    expect(link.evidence.logs?.[0]).toContain('(“Pricing” in the page header or main menu)');
+    expect(byRule('links/broken-other-link')).toEqual([]);
+  });
+
   it('verdict follows the rules: a Blocker means "not ready"', () => {
     expect(report.verdict).toBe('not-ready');
     expect(report.counts).toEqual({ blocker: 1, major: 1, minor: 5, info: 1 });

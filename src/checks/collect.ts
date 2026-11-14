@@ -1,6 +1,18 @@
 import type { Page } from 'playwright';
 import { z } from 'zod';
 
+/** One link on a page. Placement decides how bad it is when the link is broken. */
+export interface PageLink {
+  /** Absolute address. */
+  href: string;
+  /** Visible text (or aria-label), shortened. */
+  text: string;
+  /** Inside the page header or the main navigation menu (not the footer). */
+  inNavigation: boolean;
+  /** Styled or marked up as a button (class "btn", "button", "cta" or role="button"). */
+  looksLikeButton: boolean;
+}
+
 /** What we read from a page once, and then hand to the individual checks. */
 export interface PageFacts {
   url: string;
@@ -12,8 +24,8 @@ export interface PageFacts {
   h1Count: number;
   lang: string;
   hasFaviconLink: boolean;
-  /** Absolute addresses of all links (<a href>). */
-  links: string[];
+  /** All links (<a href>), with where on the page they sit. */
+  links: PageLink[];
   /** Absolute addresses of all images, and whether the browser managed to show them. */
   images: { src: string; loaded: boolean }[];
   /** Absolute addresses of external script files. */
@@ -47,8 +59,17 @@ const PAGE_FACTS_SCRIPT = `(() => {
     lang: (document.documentElement.getAttribute('lang') ?? '').trim(),
     hasFaviconLink: document.querySelector('link[rel~="icon" i]') !== null,
     links: [...document.querySelectorAll('a[href]')]
-      .map((a) => absolute(a.getAttribute('href')))
-      .filter((href) => href !== null),
+      .map((a) => ({
+        href: absolute(a.getAttribute('href')),
+        text: ((a.getAttribute('aria-label') || a.textContent || '').replace(/\\s+/g, ' ').trim()).slice(0, 80),
+        inNavigation:
+          a.closest('header, nav, [role="navigation"], [role="banner"]') !== null &&
+          a.closest('footer, [role="contentinfo"]') === null,
+        looksLikeButton:
+          a.getAttribute('role') === 'button' ||
+          /(^|[\\s_-])(btn|button|cta)([\\s_-]|$)/i.test(a.getAttribute('class') || ''),
+      }))
+      .filter((link) => link.href !== null),
     images: [...document.querySelectorAll('img')]
       .map((img) => ({
         src: absolute(img.currentSrc || img.getAttribute('src')),
@@ -71,7 +92,14 @@ const PageFactsSchema = z.object({
   h1Count: z.number(),
   lang: z.string(),
   hasFaviconLink: z.boolean(),
-  links: z.array(z.string()),
+  links: z.array(
+    z.object({
+      href: z.string(),
+      text: z.string(),
+      inNavigation: z.boolean(),
+      looksLikeButton: z.boolean(),
+    }),
+  ),
   images: z.array(z.object({ src: z.string(), loaded: z.boolean() })),
   scripts: z.array(z.string()),
 });
