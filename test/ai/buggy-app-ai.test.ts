@@ -67,6 +67,21 @@ describe.skipIf(!model)('real AI run against buggy-app (M4 acceptance)', () => {
     }
   });
 
+  it('detects planted bug #1 on the phone only (sign-up button does nothing, Blocker)', () => {
+    const found = report.findings.filter((f) => f.rule === 'signup/button-does-nothing');
+    expect(found.map((f) => [f.device, f.severity])).toEqual([['mobile', 'blocker']]);
+  });
+
+  it('detects planted bug #8 on the phone only (page scrolls sideways, Minor)', () => {
+    const found = report.findings.filter((f) => f.rule === 'mobile/sideways-scroll');
+    expect(found.map((f) => [f.device, f.severity, f.evidence.url])).toEqual([
+      ['mobile', 'minor', `${app.url}/features.html`],
+    ]);
+    expect(report.findings.filter((f) => f.category === 'mobile' && f.device !== 'mobile')).toEqual(
+      [],
+    );
+  });
+
   it('never hits the delete counter (#9) and never submits checkout or card data (#10)', () => {
     expect(app.hits).toMatchObject({ deleteAccount: 0, checkoutSubmit: 0, cardDataReceived: 0 });
   });
@@ -78,7 +93,10 @@ describe.skipIf(!model)('real AI run against buggy-app (M4 acceptance)', () => {
 
   it('raises no false Blocker or Major from the flows on things that work', () => {
     const fromFlows = report.findings.filter(
-      (f) => /^(landing|signup|login|core)\//.test(f.rule) && f.severity !== 'info',
+      (f) =>
+        /^(landing|signup|login|core)\//.test(f.rule) &&
+        f.severity !== 'info' &&
+        f.rule !== 'signup/button-does-nothing', // planted bug #1, phone only (checked above)
     );
     expect(fromFlows.map((f) => f.rule)).toEqual(['login/no-error-on-wrong-password']);
   });

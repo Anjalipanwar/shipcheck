@@ -52,9 +52,67 @@ describe('full run with all five flows', () => {
       title: 'Login shows no message when the password is wrong',
       confidence: 'verified',
     });
-    expect(finding?.evidence.screenshots).toHaveLength(1);
+    // Seen on the desktop and again on the phone: one finding for both, with both pictures.
+    expect(finding?.device).toBe('both');
+    expect(finding?.evidence.screenshots).toEqual([
+      expect.stringMatching(/-desktop-login-wrong-password-no-message\.jpg$/),
+      expect.stringMatching(/-mobile-login-wrong-password-no-message\.jpg$/),
+    ]);
     expect(finding?.evidence.logs?.join(' ')).toMatch(/status 401/);
-    expect(app.hits.loginFailed).toBe(1);
+    expect(finding?.evidence.logs).toContain('The same happens on a phone (iPhone, 390×844)');
+    expect(
+      report.findings.filter((f) => f.rule === 'login/no-error-on-wrong-password'),
+    ).toHaveLength(1);
+    expect(app.hits.loginFailed).toBe(2); // once per device
+  });
+
+  it('finds planted bug #1 on the phone only: the sign-up button does nothing (Blocker)', () => {
+    const found = report.findings.filter((f) => f.rule === 'signup/button-does-nothing');
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({
+      title: 'The sign-up button does nothing on a phone',
+      severity: 'blocker',
+      category: 'mobile',
+      flow: 'mobile',
+      device: 'mobile',
+      confidence: 'verified',
+    });
+    expect(found[0]?.whatHappened).toMatch(
+      /^On a phone-sized screen \(iPhone, 390×844\): .* On a desktop screen the same steps work\./,
+    );
+    expect(found[0]?.evidence.screenshots).toEqual([
+      expect.stringMatching(/-mobile-signup-nothing-happened\.jpg$/),
+    ]);
+    // Desktop sign-up works and is reported as working; the phone attempt never reached the server.
+    expect(report.passed).toContain('Signing up with an email address and password works');
+    expect(report.passed).not.toContain(
+      'Signing up with an email address and password works on a phone',
+    );
+    expect(app.hits.signup).toBe(1);
+  });
+
+  it('finds planted bug #8 on the phone only, and no layout finding for the desktop', () => {
+    const sideways = report.findings.filter((f) => f.rule === 'mobile/sideways-scroll');
+    expect(sideways.map((f) => [f.device, f.severity, f.evidence.url])).toEqual([
+      ['mobile', 'minor', `${app.url}/features.html`],
+    ]);
+    expect(report.findings.filter((f) => f.category === 'mobile' && f.device !== 'mobile')).toEqual(
+      [],
+    );
+  });
+
+  it('the phone pass repeats landing, sign-up, login and the main feature', () => {
+    expect(report.passed).toEqual(
+      expect.arrayContaining([
+        'Logging in with the correct password works on a phone',
+        'The main feature works: Add a note on a phone',
+        'What you enter is still there after refreshing the page on a phone',
+      ]),
+    );
+    const phoneFlows = new Set(
+      report.actionLog.filter((a) => a.device === 'mobile').map((a) => a.flow),
+    );
+    expect([...phoneFlows].sort()).toEqual(['core', 'landing', 'login', 'mobile', 'signup']);
   });
 
   it('finds planted bug #2: the contact form accepts empty and invalid input', () => {
@@ -121,7 +179,9 @@ describe('full run with all five flows', () => {
       ]),
     );
     expect(
-      rules(report)
+      report.findings
+        .filter((f) => f.device !== 'mobile')
+        .map((f) => f.rule)
         .filter((rule) => /^(landing|signup|login|core|forms)\//.test(rule))
         .sort(),
     ).toEqual([
@@ -160,7 +220,14 @@ describe('full run with all five flows', () => {
   it('counts every AI call, per run and per flow', () => {
     expect(result.llm).toBeDefined();
     const byFlow = result.llm?.byFlow ?? {};
-    expect(Object.keys(byFlow).sort()).toEqual(['core', 'forms', 'landing', 'login', 'signup']);
+    expect(Object.keys(byFlow).sort()).toEqual([
+      'core',
+      'forms',
+      'landing',
+      'login',
+      'mobile',
+      'signup',
+    ]);
     expect(Object.values(byFlow).reduce((sum, n) => sum + n, 0)).toBe(result.llm?.total);
     expect(report.meta).toMatchObject({
       mode: 'full',
@@ -169,6 +236,7 @@ describe('full run with all five flows', () => {
       llmCallsByFlow: byFlow,
     });
     expect(result.llm?.total).toBeLessThan(40);
+    expect(byFlow.mobile).toBeGreaterThan(0);
   });
 
   it('prints one progress line per flow', () => {
@@ -179,6 +247,11 @@ describe('full run with all five flows', () => {
         'Logging in… 1 issue',
         'Main feature… ✓',
         'Forms… 3 issues',
+        'Phone layout… 1 issue',
+        'Landing page on a phone… ✓',
+        'Signing up on a phone… 1 issue',
+        'Logging in on a phone… 1 issue',
+        'Main feature on a phone… ✓',
       ]),
     );
   });
@@ -229,7 +302,11 @@ describe('a misbehaving AI that goes for the traps', () => {
       if (guardEnabled) {
         for (const entry of deleteClicks) expect(entry.result).toBe('blocked');
       } else {
-        expect(deleteClicks.map((a) => a.result)).toEqual(['ok']); // clicked once, then stopped
+        // Clicked once per device (desktop, then the phone pass), each time stopped right after.
+        expect(deleteClicks.map((a) => `${a.device} ${a.result}`)).toEqual([
+          'desktop ok',
+          'mobile ok',
+        ]);
         expect(report.notTested).toContain(
           'Requests that could delete data, cancel something or start a payment were blocked by design (POST /api/delete-account)',
         );
@@ -281,6 +358,7 @@ describe('a log-in that the server refuses with 4xx although the details are rig
             flows: 'signup,login',
             email: DEMO_ACCOUNT.email,
             password: DEMO_ACCOUNT.password,
+            skipMobile: true,
           },
           {},
         ),
@@ -324,6 +402,51 @@ describe('budgets', () => {
       expect(() => ReportSchema.parse(result.report)).not.toThrow();
       // The automatic checks are unaffected by the AI budget.
       expect(rules(result.report)).toContain('secrets/stripe-secret-key');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('few AI calls left → phone flows are skipped with a note, the phone layout is still checked', async () => {
+    const app = await startFixtureServer();
+    try {
+      // The desktop flows use 17 calls on this app, leaving 3 (less than the 10 a phone flow needs).
+      const result = await runShipCheck(
+        loadConfig(app.url, { yes: true }, {}),
+        {},
+        { aiDriver: (budget) => createScriptedDriver({ budget }), maxLlmCalls: 20 },
+      );
+      expect(result.llm?.byFlow.mobile).toBeUndefined();
+      expect(result.report.notTested).toEqual(
+        expect.arrayContaining([
+          'Landing page on a phone — skipped to stay within the limit of 20 AI calls for one run',
+          'Signing up on a phone — skipped to stay within the limit of 20 AI calls for one run',
+          'Logging in on a phone — skipped to stay within the limit of 20 AI calls for one run',
+          'Main feature on a phone — skipped to stay within the limit of 20 AI calls for one run',
+        ]),
+      );
+      expect(result.report.meta.partial).toBe(true);
+      expect(rules(result.report)).toContain('mobile/sideways-scroll');
+      expect(rules(result.report)).not.toContain('signup/button-does-nothing');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('--skip-mobile leaves out the whole phone pass and says so', async () => {
+    const app = await startFixtureServer();
+    try {
+      const result = await runShipCheck(
+        loadConfig(app.url, { yes: true, skipMobile: true }, {}),
+        {},
+        { aiDriver: (budget) => createScriptedDriver({ budget }) },
+      );
+      expect(result.report.actionLog.filter((a) => a.device === 'mobile')).toEqual([]);
+      expect(result.report.findings.filter((f) => f.device === 'mobile')).toEqual([]);
+      expect(result.llm?.byFlow.mobile).toBeUndefined();
+      expect(result.report.notTested).toContain(
+        'The phone-sized pass — left out with --skip-mobile',
+      );
     } finally {
       await app.close();
     }

@@ -135,7 +135,7 @@ describe('describeBlocking', () => {
       'Payment requests were blocked by design (to api.stripe.com, js.stripe.com), so paying was not tested',
       'Requests that could delete data, cancel something or start a payment were blocked by design (POST /api/delete-account)',
       'Pages on other websites (twitter.com) — ShipCheck only tests the app you asked for',
-      '3 error messages and failed requests were caused by this blocking and are not counted as problems in your app',
+      'Error messages caused by this blocking were ignored (3 in total) — they are not problems in your app',
     ]);
   });
 

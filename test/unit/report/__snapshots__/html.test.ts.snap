@@ -20,7 +20,7 @@ exports[`HTML structure snapshot > matches the stored structure of a report that
 <p>At least one problem would stop a new user or put your accounts at risk. Fix the blockers before you launch.</p>
 <ul class="counts" aria-label="Issues by severity"><li><span class="badge sev-blocker" title="Blocker: a new user cannot get through, or a secret is exposed">1 Blocker</span></li><li><span class="badge sev-major" title="Major: it works, but is broken or confusing for many users">1 Major</span></li><li><span class="badge sev-minor" title="Minor: polish and edge cases">1 Minor</span></li><li><span class="badge sev-info" title="Info: good to know, not a bug">1 Info</span></li></ul>
 </section>
-<p class="caveat"><strong>Note:</strong> This verdict is based on the automatic checks only. Signing up, logging in, the main feature, forms and the phone-sized pass were not tested, because this run used no AI key.</p>
+<p class="caveat"><strong>Note:</strong> This verdict is based on the automatic checks only. Signing up, logging in, the main feature and forms were not tested (on desktop or on a phone), because this run used no AI key. The phone layout was checked.</p>
 <section aria-labelledby="first-title">
 <h2 id="first-title">Fix these first</h2>
 <div class="panel"><ol class="first"><li><span class="badge sev-blocker">Blocker</span><a href="#issue-1">A secret key is visible to anyone who visits your app</a></li><li><span class="badge sev-major">Major</span><a href="#issue-2">Login shows no message when the password is wrong</a></li><li><span class="badge sev-minor">Minor</span><a href="#issue-3">Your home page has no description for search results</a></li></ol></div>

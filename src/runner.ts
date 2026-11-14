@@ -1,7 +1,7 @@
 import { LlmBudget, type BudgetSummary } from './ai/budget.js';
 import { createStagehandDriver, freePort, type AiDriver } from './ai/driver.js';
 import type { ModelChoice } from './ai/models.js';
-import { DESKTOP } from './browser/devices.js';
+import { DESKTOP, MOBILE, type DevicePreset } from './browser/devices.js';
 import { Evidence, type Screenshot } from './browser/evidence.js';
 import { isRiskyUrl } from './browser/guard.js';
 import { BrowserSession, gotoWithRetry, type DevicePage } from './browser/session.js';
@@ -17,7 +17,9 @@ import { checkErrors } from './checks/errors.js';
 import { safeFetch } from './checks/fetch.js';
 import { checkHeaders } from './checks/headers.js';
 import { checkHttps } from './checks/https.js';
-import { checkLinks, selectLinkTargets, type LinkProbe } from './checks/links.js';
+import { checkLinks, linkPlacement, selectLinkTargets, type LinkProbe } from './checks/links.js';
+import { checkPhoneMenu } from './checks/mobile-menu.js';
+import { collectLayoutFacts, judgeLayout, type CheckedPage } from './checks/mobile-layout.js';
 import { checkPerformance } from './checks/performance.js';
 import { checkSecrets, type SecretSource } from './checks/secrets.js';
 import { checkSeo } from './checks/seo.js';
@@ -106,15 +108,22 @@ const FLOWS: Record<Exclude<FlowName, 'mobile'>, FlowBody> = {
   forms: formsFlow,
 };
 
+/** Flows repeated on the phone (SPEC §6.1 flow 6; signup too, because of planted bug #1). */
+export const PHONE_FLOWS = ['landing', 'signup', 'login', 'core'] as const;
+/** A phone flow is only started if at least this many AI calls are left. */
+export const PHONE_FLOW_MIN_CALLS = 10;
+/** Pages checked for phone layout: the home page and up to this many linked pages. */
+const PHONE_LAYOUT_EXTRA_PAGES = 5;
+
 /** Until the AI judge exists (M6), a problem a flow observed becomes a finding as it stands. */
-function toFinding(observation: Observation): Finding {
+function toFinding(observation: Observation, device: 'desktop' | 'mobile' = 'desktop'): Finding {
   return makeFinding({
     rule: observation.rule,
     title: observation.title,
     severity: observation.severity,
     category: observation.category,
     flow: observation.flow,
-    device: 'desktop',
+    device,
     whatHappened:
       observation.severity === 'info'
         ? observation.actual
@@ -329,29 +338,58 @@ export async function runShipCheck(
         progress('Starting the AI tester… could not start');
       }
     }
-    if (ai && landing) {
-      const shared: SharedState = { loggedIn: false };
-      let active = desktop;
-      for (const name of config.flows) {
+    /** Runs flows on one device, each in isolation; login starts from a fresh browser profile. */
+    const runFlows = async (
+      preset: DevicePreset,
+      names: readonly Exclude<FlowName, 'mobile'>[],
+      shared: SharedState,
+      first: DevicePage,
+      before?: (name: Exclude<FlowName, 'mobile'>) => string | undefined,
+    ): Promise<FlowResult[]> => {
+      const results: FlowResult[] = [];
+      let active = first;
+      for (const name of names) {
+        const skipped = before?.(name);
+        if (skipped) {
+          collector.partial = true;
+          collector.notTested.push(skipped);
+          continue;
+        }
         if (name === 'login') {
-          // A fresh browser profile: logging in must be tested from a logged-out state.
           await active.context.close().catch(() => undefined);
-          active = await session.open(DESKTOP);
+          active = await session.open(preset);
           shared.loggedIn = false;
         }
         const deps: FlowDeps = {
           page: active.page,
-          device: 'desktop',
+          device: preset.name,
           config,
-          ai,
+          ai: ai as AiDriver,
           evidence,
           budget,
           deadline,
           shared,
-          homeUrl: landing.finalUrl,
+          homeUrl: (landing as Landing).finalUrl,
           ...(options.guardEnabled === false ? { guardEnabled: false } : {}),
         };
         const result = await runFlow(name, deps, FLOWS[name]);
+        results.push(result);
+        for (const line of result.notTested) {
+          if (!collector.notTested.includes(line)) collector.notTested.push(line);
+        }
+        if (result.status !== 'completed') collector.partial = true;
+        const label = `${FLOW_LABEL[name]}${preset.name === 'mobile' ? ' on a phone' : ''}`;
+        progress(`${label}… ${flowSummary(result)}`);
+      }
+      await active.context.close().catch(() => undefined);
+      return results;
+    };
+
+    const desktopResults: FlowResult[] = [];
+    let shared: SharedState = { loggedIn: false };
+    if (ai && landing) {
+      desktopResults.push(...(await runFlows(DESKTOP, config.flows, shared, desktop)));
+      for (const result of desktopResults) {
         for (const observation of result.observations) {
           if (observation.ok) collector.passed.push(observation.title);
           else {
@@ -361,11 +399,26 @@ export async function runShipCheck(
             }
           }
         }
-        for (const line of result.notTested) {
-          if (!collector.notTested.includes(line)) collector.notTested.push(line);
-        }
-        if (result.status !== 'completed') collector.partial = true;
-        progress(`${FLOW_LABEL[name]}… ${flowSummary(result)}`);
+      }
+    }
+
+    // The phone-sized pass (SPEC §6.1 flow 6). Layout checks need no AI; flows run if they can.
+    if (landing && !config.skipMobile && Date.now() < deadline) {
+      const phone = await session.open(MOBILE);
+      await step('Phone layout', () =>
+        phoneLayout(phone, landing.finalUrl, facts(landing), session, evidence, options),
+      );
+      if (ai) {
+        shared = { loggedIn: false, ...(shared.account ? { account: shared.account } : {}) };
+        const names = PHONE_FLOWS.filter((name) => config.flows.includes(name));
+        const phoneResults = await runFlows(MOBILE, names, shared, phone, (name) =>
+          budget.remaining < PHONE_FLOW_MIN_CALLS
+            ? `${FLOW_LABEL[name]} on a phone — skipped to stay within the limit of ${budget.maxCalls} AI calls for one run`
+            : undefined,
+        );
+        mergePhoneResults(phoneResults, desktopResults, collector);
+      } else {
+        await phone.context.close().catch(() => undefined);
       }
     }
 
@@ -379,7 +432,7 @@ export async function runShipCheck(
 
   if (config.noAi) {
     collector.notTested.push(
-      'Signing up, logging in, the main feature, forms and the phone-sized pass — these need an AI key (this run used --no-ai)',
+      `Signing up, logging in, the main feature and forms, on desktop and on a phone — these need an AI key (this run used --no-ai)${config.skipMobile ? '' : '. The phone layout was checked'}`,
     );
   } else {
     const left = (['landing', 'signup', 'login', 'core', 'forms'] as const).filter(
@@ -390,7 +443,9 @@ export async function runShipCheck(
         `${left.map((name) => FLOW_LABEL[name]).join(', ')} — left out with --flows`,
       );
     }
-    collector.notTested.push('The phone-sized pass — not part of this version yet');
+  }
+  if (config.skipMobile) {
+    collector.notTested.push('The phone-sized pass — left out with --skip-mobile');
   }
   collector.notTested.push(
     ...describeBlocking(evidence.events, separateShipCheckBlocking(evidence.events).ours.length),
@@ -499,4 +554,144 @@ async function openLanding(
   progress('Opening your app… ✓');
   collector.passed.push('Home page opens');
   return { facts: await collectPageFacts(desktop.page), headers, finalUrl: desktop.page.url() };
+}
+
+const facts = (landing: Landing): PageFacts => landing.facts;
+
+/**
+ * Phone layout checks: the home page and up to five pages linked from it (menu and main buttons
+ * first), each opened at iPhone size. The menu button is tapped once, on the home page only.
+ */
+async function phoneLayout(
+  phone: DevicePage,
+  homeUrl: string,
+  home: PageFacts,
+  session: BrowserSession,
+  evidence: Evidence,
+  options: RunOptions,
+): Promise<CheckResult> {
+  evidence.setScope('mobile');
+  try {
+    const rank = { navigation: 0, 'call-to-action': 1, other: 2 } as const;
+    const seen = new Set([new URL(homeUrl).pathname]);
+    const extra: string[] = [];
+    const links = [...home.links].sort((a, b) => rank[linkPlacement(a)] - rank[linkPlacement(b)]);
+    for (const link of links) {
+      if (extra.length >= PHONE_LAYOUT_EXTRA_PAGES) break;
+      let url: URL;
+      try {
+        url = new URL(link.href);
+      } catch {
+        continue;
+      }
+      url.hash = '';
+      if (!session.lock.isAllowed(url.href) || isRiskyUrl(url.href) || seen.has(url.pathname)) {
+        continue;
+      }
+      seen.add(url.pathname);
+      extra.push(url.href);
+    }
+
+    const checked: CheckedPage[] = [];
+    let menu: CheckResult = { findings: [], passed: [], notTested: [] };
+    for (const url of [homeUrl, ...extra]) {
+      let status: number | null = null;
+      try {
+        status = (await gotoWithRetry(phone.page, url))?.status() ?? null;
+      } catch {
+        status = null;
+      }
+      evidence.logAction({
+        device: 'mobile',
+        flow: 'mobile',
+        intent: 'Open the page on a phone to check its layout',
+        action: 'goto',
+        url,
+        result: status !== null && status < 400 ? 'ok' : 'failed',
+      });
+      if (status === null || status >= 400) continue; // broken pages are the link check's job
+      const pageFacts = await collectLayoutFacts(phone.page);
+      const problem =
+        pageFacts.pageWidth > pageFacts.screenWidth + 1 ||
+        pageFacts.cutOff.length + pageFacts.covered.length + pageFacts.tooSmall.length > 0;
+      const shot = problem
+        ? await evidence.screenshot(phone.page, 'mobile', `layout ${new URL(url).pathname}`)
+        : undefined;
+      checked.push({ facts: pageFacts, ...(shot ? { screenshot: shot.file } : {}) });
+      if (url === homeUrl) {
+        menu = await checkPhoneMenu(phone.page, {
+          device: 'mobile',
+          evidence,
+          ...(options.guardEnabled === false ? { guardEnabled: false } : {}),
+        });
+      }
+    }
+    const layout = judgeLayout(checked);
+    return {
+      findings: [...layout.findings, ...menu.findings],
+      passed: [...layout.passed, ...menu.passed],
+      notTested: [...layout.notTested, ...menu.notTested],
+    };
+  } finally {
+    evidence.setScope(undefined);
+  }
+}
+
+/**
+ * Folds the phone flows into the report. The same problem on both devices becomes one finding
+ * for "both"; a problem only seen on the phone becomes a phone finding, never a desktop one.
+ */
+function mergePhoneResults(
+  phone: readonly FlowResult[],
+  desktop: readonly FlowResult[],
+  collector: Collector,
+): void {
+  for (const result of phone) {
+    const onDesktop = desktop.find((d) => d.name === result.name);
+    for (const observation of result.observations) {
+      if (observation.ok) {
+        const line = `${observation.title} on a phone`;
+        if (!collector.passed.includes(line)) collector.passed.push(line);
+        continue;
+      }
+      const index = collector.findings.findIndex(
+        (f) => f.rule === observation.rule && f.device === 'desktop',
+      );
+      const same = collector.findings[index];
+      if (same) {
+        if (observation.severity === 'info') continue; // e.g. "Reached payment", already listed
+        collector.findings[index] = makeFinding({
+          ...same,
+          device: 'both',
+          evidence: {
+            ...same.evidence,
+            screenshots: [...same.evidence.screenshots, ...observation.screenshots],
+            logs: [...(same.evidence.logs ?? []), 'The same happens on a phone (iPhone, 390×844)'],
+          },
+        });
+        continue;
+      }
+      const worksOnDesktop =
+        onDesktop?.status === 'completed' &&
+        onDesktop.observations.some((o) => o.ok) &&
+        !onDesktop.observations.some((o) => !o.ok && o.severity !== 'info');
+      const finding = toFinding(
+        {
+          ...observation,
+          flow: 'mobile',
+          category: observation.category === 'coverage' ? 'coverage' : 'mobile',
+          title: `${observation.title} on a phone`,
+          actual: `On a phone-sized screen (iPhone, 390×844): ${observation.actual}${
+            worksOnDesktop ? ' On a desktop screen the same steps work.' : ''
+          }`,
+          steps: [
+            'Use a phone, or Chrome’s phone view (right-click → Inspect → the phone icon).',
+            ...observation.steps,
+          ],
+        },
+        'mobile',
+      );
+      if (!collector.findings.some((f) => f.id === finding.id)) collector.findings.push(finding);
+    }
+  }
 }

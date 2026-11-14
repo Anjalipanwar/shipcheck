@@ -164,7 +164,7 @@ export function runCaveats(report: Report): string[] {
   const caveats: string[] = [];
   if (report.meta.mode === 'no-ai') {
     caveats.push(
-      'This verdict is based on the automatic checks only. Signing up, logging in, the main feature, forms and the phone-sized pass were not tested, because this run used no AI key.',
+      'This verdict is based on the automatic checks only. Signing up, logging in, the main feature and forms were not tested (on desktop or on a phone), because this run used no AI key. The phone layout was checked.',
     );
   }
   if (report.meta.partial) {

@@ -27,6 +27,13 @@ function ofKind<K extends EvidenceEvent['kind']>(
 const firstUrl = (events: readonly EvidenceEvent[]): string | undefined =>
   events[0]?.pageUrl || undefined;
 
+/** Which screen(s) the events were seen on. */
+function deviceOf(events: readonly EvidenceEvent[]): 'desktop' | 'mobile' | 'both' {
+  const devices = new Set(events.map((e) => e.device));
+  if (devices.size !== 1) return 'both';
+  return devices.has('mobile') ? 'mobile' : 'desktop';
+}
+
 /**
  * Runtime errors seen during the whole run (SPEC §6.2): crashes in the page's code, error
  * messages in the browser console, and requests that failed.
@@ -45,7 +52,7 @@ export function checkErrors(events: readonly EvidenceEvent[]): CheckResult {
         title: 'Part of your app’s code crashes in the background',
         severity: 'minor',
         category: 'errors',
-        device: 'desktop',
+        device: deviceOf(crashes),
         whatHappened: `While pages were loading, the app’s code hit ${crashes.length === 1 ? 'an error' : `${crashes.length} errors`} that it did not handle. Visitors don’t see a message, but whatever that code was meant to do did not happen.`,
         whyItMatters:
           'A silent crash can leave buttons, tracking or other features not working, and it is often the first sign of a bigger bug.',
@@ -81,7 +88,7 @@ export function checkErrors(events: readonly EvidenceEvent[]): CheckResult {
         title: 'Your app reports errors in the browser’s error log',
         severity: 'minor',
         category: 'errors',
-        device: 'desktop',
+        device: deviceOf(consoleErrors),
         whatHappened: `The app wrote ${consoleErrors.length === 1 ? 'an error message' : `${consoleErrors.length} error messages`} to the browser’s hidden error log while it was being used.`,
         whyItMatters:
           'These messages usually point at something that is not working as intended, even when the page looks fine.',
@@ -118,7 +125,7 @@ export function checkErrors(events: readonly EvidenceEvent[]): CheckResult {
         title: 'Your app’s server answered with an error',
         severity: 'major',
         category: 'errors',
-        device: 'desktop',
+        device: deviceOf(serverErrors),
         whatHappened: `The app asked its server for data ${serverErrors.length === 1 ? 'and the server replied' : `${serverErrors.length} times and the server replied`} with an internal error.`,
         whyItMatters:
           'When the server fails, visitors see missing data, endless loading or actions that silently do nothing.',
@@ -149,7 +156,7 @@ export function checkErrors(events: readonly EvidenceEvent[]): CheckResult {
         title: 'A file your app needs in order to work could not be loaded',
         severity: 'major',
         category: 'errors',
-        device: 'desktop',
+        device: deviceOf(missingCode),
         whatHappened: `The page asked for ${missingCode.length === 1 ? 'a code or style file' : `${missingCode.length} code or style files`} and the server could not provide ${missingCode.length === 1 ? 'it' : 'them'}.`,
         whyItMatters:
           'Without these files, parts of the page can look broken or stop responding to clicks.',
@@ -195,7 +202,7 @@ export function checkErrors(events: readonly EvidenceEvent[]): CheckResult {
         title: 'Some background requests made by your app failed',
         severity: 'minor',
         category: 'errors',
-        device: 'desktop',
+        device: deviceOf([...clientErrors, ...dropped]),
         whatHappened:
           'While the app was loading, some of its requests for data were refused or never got an answer.',
         whyItMatters:

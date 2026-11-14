@@ -90,18 +90,26 @@ export class FlowContext {
   get homeUrl(): string {
     return this.deps.homeUrl;
   }
+  get device(): FlowDeps['device'] {
+    return this.deps.device;
+  }
+
+  /** "Signing up", or "Signing up on a phone" during the phone-sized pass. */
+  get label(): string {
+    return `${FLOW_LABEL[this.flow]}${this.deps.device === 'mobile' ? ' on a phone' : ''}`;
+  }
 
   private checkLimits(): void {
     if (Date.now() >= this.deps.deadline) {
       throw new StopFlow(
         'budget',
-        `${FLOW_LABEL[this.flow]} — the time limit of ${this.config.maxMinutes} minutes was reached`,
+        `${this.label} — the time limit of ${this.config.maxMinutes} minutes was reached`,
       );
     }
     if (this.steps >= MAX_FLOW_STEPS) {
       throw new StopFlow(
         'steps',
-        `${FLOW_LABEL[this.flow]} — stopped after ${MAX_FLOW_STEPS} steps without finishing`,
+        `${this.label} — stopped after ${MAX_FLOW_STEPS} steps without finishing`,
       );
     }
   }
@@ -110,15 +118,15 @@ export class FlowContext {
     if (error instanceof QuotaExhaustedError) {
       throw new StopFlow(
         'quota',
-        `${FLOW_LABEL[this.flow]} — your AI key’s quota ran out (the AI service kept answering “too many requests”)`,
+        `${this.label} — your AI key’s quota ran out (the AI service kept answering “too many requests”)`,
       );
     }
     if (error instanceof BudgetExceededError) {
       throw new StopFlow(
         'budget',
         error.limit === 'calls'
-          ? `${FLOW_LABEL[this.flow]} — the limit of ${this.deps.budget.maxCalls} AI calls for one run was reached`
-          : `${FLOW_LABEL[this.flow]} — the time limit of ${this.config.maxMinutes} minutes was reached`,
+          ? `${this.label} — the limit of ${this.deps.budget.maxCalls} AI calls for one run was reached`
+          : `${this.label} — the time limit of ${this.config.maxMinutes} minutes was reached`,
       );
     }
     throw error;
@@ -217,7 +225,7 @@ export class FlowContext {
       const blocked = this.blockedActions().at(-1);
       throw new StopFlow(
         'blocked-request',
-        `${FLOW_LABEL[this.flow]} — stopped by design: the last step tried to send ${
+        `${this.label} — stopped by design: the last step tried to send ${
           blocked?.kind === 'blocked-request'
             ? blocked.reason
             : 'a request ShipCheck does not allow'
@@ -322,8 +330,13 @@ export class FlowContext {
     this.observations.push({ flow: this.flow, ...observation });
   }
 
+  /** Adds a line for "What we couldn't test". On the phone, "Signing up — …" gets "on a phone". */
   skip(line: string): void {
-    this.notTested.push(line);
+    this.notTested.push(
+      this.deps.device === 'mobile' && !/^[^—]* on a phone — /.test(line)
+        ? line.replace(/^([^—]+?) — /, '$1 on a phone — ')
+        : line,
+    );
   }
 
   result(status: FlowResult['status']): FlowResult {
@@ -345,8 +358,9 @@ export type FlowBody = (ctx: FlowContext) => Promise<void>;
  */
 export async function runFlow(name: FlowName, deps: FlowDeps, body: FlowBody): Promise<FlowResult> {
   const ctx = new FlowContext(name, deps);
-  deps.budget.setFlow(name);
-  deps.evidence.setScope(name);
+  // Phone flows share one line in the AI call count ("mobile"), as the spec lists flow 6.
+  deps.budget.setFlow(deps.device === 'mobile' ? 'mobile' : name);
+  deps.evidence.setScope(deps.device === 'mobile' ? `mobile ${name}` : name);
   try {
     await ctx.shot('start');
     await body(ctx);
@@ -358,7 +372,7 @@ export async function runFlow(name: FlowName, deps: FlowDeps, body: FlowBody): P
       ctx.skip(error.note);
       return ctx.result('stopped');
     }
-    ctx.skip(`${FLOW_LABEL[name]} — this part of the test could not finish`);
+    ctx.skip(`${ctx.label} — this part of the test could not finish`);
     if (process.env.SHIPCHECK_DEBUG) console.error(error);
     return ctx.result('failed');
   } finally {

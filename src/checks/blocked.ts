@@ -144,7 +144,7 @@ export function describeBlocking(events: readonly EvidenceEvent[], echoes: numbe
   }
   if (echoes > 0) {
     lines.push(
-      `${echoes} ${echoes === 1 ? 'error message or failed request was' : 'error messages and failed requests were'} caused by this blocking and ${echoes === 1 ? 'is' : 'are'} not counted as ${echoes === 1 ? 'a problem' : 'problems'} in your app`,
+      `Error messages caused by this blocking were ignored (${echoes} in total) — they are not problems in your app`,
     );
   }
   return lines;

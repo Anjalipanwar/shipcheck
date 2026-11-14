@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-14, M4 follow-ups done; M5 in progress
-- **Next up:** M5 — mobile pass (owner said "go" on 2026-11-14)
+- **Last updated:** 2026-11-14, after M5
+- **Next up:** M6 — AI judge, fix prompts, dedupe (waiting for the owner's "go")
 
 ## Overview
 
@@ -15,7 +15,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
 | M3 — Report renderer and verdict                     | done        | `8e0b406` | yes    |
 | M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63` | yes    |
-| M5 — Mobile pass                                     | not started | —         | —      |
+| M5 — Mobile pass                                     | done        | _see M5_  | no     |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
 | M7 — CLI polish                                      | not started | —         | —      |
 | M8 — GitHub Action                                   | not started | —         | —      |
@@ -185,8 +185,8 @@ Updated at the end of every milestone. Read this at the start of every session.
 ## M4 follow-ups (owner decisions of 2026-11-14)
 
 - **Status:** done
-- **Commit:** recorded below after committing
-- **Pushed:** —
+- **Commit:** `215e69a`
+- **Pushed:** no — waiting for the owner's answer
 
 **What was built**
 
@@ -205,6 +205,40 @@ Updated at the end of every milestone. Read this at the start of every session.
 **Open questions**
 
 - The new real-AI assertion for the payment widget was added after the one `npm run test:ai` run the owner approved, so it has not run against the real AI yet. The scripted e2e tests cover the same behaviour.
+
+---
+
+## M5 — Mobile pass
+
+- **Status:** done
+- **Commit:** _filled in after committing_
+- **Pushed:** no — waiting for the owner's answer
+
+**What was built:** the phone-sized pass (iPhone, 390×844, touch, mobile browser identity).
+
+- **Phone layout checks** (`checks/mobile-layout.ts`), no AI needed: sideways scrolling (names the element that is too wide), buttons cut off at the screen edge, buttons covered by another element, tap targets that are too small (WCAG 2.5.8). Home page and up to 5 linked pages.
+- **Phone menu check** (`checks/mobile-menu.ts`): taps the header's menu button once (guarded) and checks that the menu opens.
+- **Phone flows:** landing, sign-up, login and main feature run again on the phone when at least 10 AI calls are left. Results are merged: the same problem on both devices becomes one finding for "both"; a phone-only problem becomes "… on a phone".
+
+**Result against buggy-app**
+
+- Real AI (Gemini `gemini-3.5-flash-lite`, `npm run test:ai`): 11/11 checks pass, 30 of 150 AI calls (11 for the phone). Bug #1: "The sign-up button does nothing on a phone" — Blocker, phone only; desktop sign-up reported as working. Bug #8: "A page scrolls sideways on a phone" — Minor, phone only, cause "a table that is 900 px wide". Bug #7 is now one finding for both devices. Trap counters 0.
+- Without AI (built CLI, `node dist/cli.js <fixture> --no-ai`): bug #8 is found as well; 1 Blocker · 1 Major · 6 Minor · 1 Info. The phone finding's card shows the phone screenshot (checked visually).
+
+**Tests:** 408 unit tests, 99 real-browser tests, 11 real-AI tests. The new real-browser tests use synthetic phone pages for each rule and each exception (closed drawer menu, carousel, icon inside a button, a lone small button with space around it, links inside text), and for the menu check (opens, does not open, refused by the guard).
+
+**Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
+
+1. Sign-up is repeated on the phone (needed for bug #1; §6.1 names only landing and login/main feature).
+2. Phone layout checks also run with `--no-ai`.
+3. Severities: sideways scrolling Minor, cut-off or covered button Major, small tap targets Minor (WCAG 2.5.8).
+4. Menu check taps the first menu-like header button once, guarded.
+5. Merge rules for desktop + phone; phone flows need at least 10 AI calls left.
+
+**Open questions**
+
+- The fixture has no menu button, so the menu check is proven only with synthetic pages. Add a hamburger menu to a fixture page (would change the fixture's phone layout)?
+- The "covered button" rule also fires for a fixed chat or cookie banner that covers a button at load. That is real for the visitor, but such banners can be closed. Keep it Major, or make it Minor?
 
 ---
 

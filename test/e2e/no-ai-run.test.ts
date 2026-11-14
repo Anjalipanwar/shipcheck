@@ -83,6 +83,36 @@ describe('planted bugs found without AI', () => {
     );
   });
 
+  it('#8 the features page scrolls sideways on a phone — Minor, phone only, with a screenshot', () => {
+    const finding = only('mobile/sideways-scroll');
+    expect(finding).toMatchObject({
+      title: 'A page scrolls sideways on a phone',
+      severity: 'minor',
+      category: 'mobile',
+      device: 'mobile',
+      confidence: 'verified',
+    });
+    expect(finding.evidence.url).toBe(`${app.url}/features.html`);
+    expect(finding.evidence.logs).toEqual([
+      expect.stringMatching(
+        /features\.html: page is \d+ px wide on a 390 px screen — widest part: table\.plans, 900 px$/,
+      ),
+    ]);
+    expect(finding.evidence.screenshots).toEqual([
+      'screenshots/02-mobile-layout-features-html.jpg',
+    ]);
+    // Nothing about layout is ever said about the desktop.
+    expect(report.findings.filter((f) => f.category === 'mobile' && f.device !== 'mobile')).toEqual(
+      [],
+    );
+    expect(report.passed).toEqual(
+      expect.arrayContaining([
+        'Buttons and menu links are big enough to tap on a phone',
+        'No buttons are cut off or covered on a phone',
+      ]),
+    );
+  });
+
   it('#6 secret key flagged as Blocker and masked; public key NOT flagged', () => {
     const secret = only('secrets/stripe-secret-key');
     expect(secret).toMatchObject({ severity: 'blocker', category: 'security' });
@@ -114,6 +144,7 @@ describe('expected extras and nothing else', () => {
         'https/local-address',
         'links/broken-image',
         'links/broken-link',
+        'mobile/sideways-scroll',
         'secrets/stripe-secret-key',
         'seo/missing-description',
         'seo/missing-open-graph',
@@ -133,7 +164,7 @@ describe('expected extras and nothing else', () => {
     expect(report.notTested).toEqual(
       expect.arrayContaining([
         expect.stringMatching(
-          /^\d+ error messages and failed requests were caused by this blocking and are not counted as problems in your app$/,
+          /^Error messages caused by this blocking were ignored \(\d+ in total\) — they are not problems in your app$/,
         ),
       ]),
     );
@@ -155,7 +186,7 @@ describe('expected extras and nothing else', () => {
 
   it('verdict follows the rules: a Blocker means "not ready"', () => {
     expect(report.verdict).toBe('not-ready');
-    expect(report.counts).toEqual({ blocker: 1, major: 1, minor: 5, info: 1 });
+    expect(report.counts).toEqual({ blocker: 1, major: 1, minor: 6, info: 1 });
     expect(report.findings[0]?.severity).toBe('blocker');
   });
 
@@ -183,7 +214,9 @@ describe('expected extras and nothing else', () => {
     expect(report.passed.join('\n')).toMatch(
       /No serious accessibility problems found on the 2 pages/,
     );
-    expect(report.notTested.join('\n')).toMatch(/need an AI key/);
+    expect(report.notTested.join('\n')).toMatch(
+      /on desktop and on a phone — these need an AI key \(this run used --no-ai\)\. The phone layout was checked/,
+    );
     expect(report.meta).toMatchObject({
       mode: 'no-ai',
       model: null,
@@ -232,11 +265,26 @@ describe('safety (SPEC §7)', () => {
   });
 
   it('kept a precise action log and a home page screenshot', async () => {
-    expect(report.actionLog.map((a) => `${a.action} ${a.url} ${a.result}`)).toEqual([
-      `goto ${app.url}/ ok`,
-      `goto ${app.url}/features.html ok`,
+    expect(
+      report.actionLog.map(
+        (a) => `${a.device} ${a.action} ${a.url.replace(app.url, '')} ${a.result}`,
+      ),
+    ).toEqual([
+      'desktop goto / ok',
+      'desktop goto /features.html ok',
+      // Phone layout: home page, then menu links first (no menu button to tap on this app).
+      'mobile goto / ok',
+      'mobile goto /features.html ok',
+      'mobile goto /pricing.html failed',
+      'mobile goto /contact.html ok',
+      'mobile goto /login.html ok',
+      'mobile goto /signup.html ok',
     ]);
-    expect(await readdir(join(outDir, 'screenshots'))).toEqual(['01-desktop-home-page.jpg']);
+    // A phone screenshot only where the layout has a problem (bug #8).
+    expect(await readdir(join(outDir, 'screenshots'))).toEqual([
+      '01-desktop-home-page.jpg',
+      '02-mobile-layout-features-html.jpg',
+    ]);
   });
 });
 

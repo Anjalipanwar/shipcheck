@@ -95,22 +95,23 @@ describe('report.html from a real run', () => {
     await expect(page.title()).resolves.toMatch(/^ShipCheck report — Not ready — 127\.0\.0\.1/);
   });
 
-  it('shows the verdict, the counts and the eight findings of the fixture app', async () => {
+  it('shows the verdict, the counts and the nine findings of the fixture app (no-AI run, phone layout included)', async () => {
     const page = await open(DESKTOP);
     expect(await page.locator('.verdict .big').innerText()).toBe('Not ready');
     expect(await page.locator('.counts li').allInnerTexts()).toEqual([
       '1 Blocker',
       '1 Major',
-      '5 Minor',
+      '6 Minor',
       '1 Info',
     ]);
-    expect(await page.locator('article.card').count()).toBe(8);
+    expect(await page.locator('article.card').count()).toBe(9);
     expect(await page.locator('ol.first a').allInnerTexts()).toEqual([
       'A secret key is visible to anyone who visits your app (Stripe secret key)',
       'The “Pricing” link in your main menu leads to a page that does not exist',
       '4 recommended security settings are switched off',
     ]);
     expect(await page.locator('main h3').allInnerTexts()).toEqual([
+      'MOBILE',
       'ACROSS THE APP',
       'SECURITY',
       'SEARCH AND SHARING (SEO)',
@@ -153,7 +154,10 @@ describe('report.html from a real run', () => {
     await dialog.getByRole('button', { name: 'Close' }).click();
     await expect(dialog.isVisible()).resolves.toBe(false);
 
-    await page.getByRole('button', { name: /^Enlarge screenshot/ }).click();
+    await page
+      .getByRole('button', { name: /^Enlarge screenshot/ })
+      .first()
+      .click();
     await page.keyboard.press('Escape');
     await expect(dialog.isVisible()).resolves.toBe(false);
   });
@@ -177,7 +181,10 @@ describe('report.html from a real run', () => {
       const page = await open(viewport, { colorScheme });
       await page.locator('article.card details summary').first().click();
       expect(await seriousViolations(page)).toEqual([]);
-      await page.getByRole('button', { name: /^Enlarge screenshot/ }).click();
+      await page
+        .getByRole('button', { name: /^Enlarge screenshot/ })
+        .first()
+        .click();
       expect(await seriousViolations(page)).toEqual([]);
     },
   );
@@ -207,7 +214,7 @@ describe('report.html from a real run', () => {
 
   it('stays readable with JavaScript switched off, and hides controls that need it', async () => {
     const page = await open(DESKTOP, { javaScriptEnabled: false });
-    expect(await page.locator('article.card').count()).toBe(8);
+    expect(await page.locator('article.card').count()).toBe(9);
     await expect(page.locator('.fix pre').first().isVisible()).resolves.toBe(true);
     await expect(page.locator('button.copy').first().isVisible()).resolves.toBe(false);
     await expect(page.locator('.shot img').first().isVisible()).resolves.toBe(true);
