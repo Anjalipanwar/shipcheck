@@ -72,6 +72,44 @@ describe('full run with all five flows', () => {
     expect(app.contactSubmissions[1]?.name).toHaveLength(5000);
   });
 
+  it('finds planted bug #11: a double click sends the contact form twice (Minor)', () => {
+    const finding = report.findings.find((f) => f.rule === 'forms/duplicate-submit');
+    expect(finding).toMatchObject({
+      severity: 'minor',
+      flow: 'forms',
+      title: 'Clicking a form’s button twice sends it twice',
+      confidence: 'verified',
+    });
+    expect(finding?.evidence.url).toBe(`${app.url}/contact.html`);
+    expect(finding?.evidence.logs).toHaveLength(2);
+    // empty + bad input + the double click (2) = 4 accepted submissions
+    expect(app.hits.contact).toBe(4);
+  });
+
+  it('opposite case: the newsletter form is sent once and gets no form finding at all', () => {
+    // It was really double-clicked with a valid address…
+    const double = report.actionLog.filter(
+      (a) => a.action === 'doubleClick' && a.locator === 'xpath=//*[@id="newsletter-button"]',
+    );
+    expect(double.map((a) => a.result)).toEqual(['ok']);
+    // …the server got exactly one sign-up (the empty and the invalid attempt were refused)…
+    expect(app.hits.newsletter).toBe(1);
+    // …and nothing is reported against the home page's form.
+    const formFindings = report.findings.filter((f) => f.rule.startsWith('forms/'));
+    expect(formFindings.map((f) => f.evidence.url)).toEqual([
+      `${app.url}/contact.html`,
+      `${app.url}/contact.html`,
+      `${app.url}/contact.html`,
+    ]);
+    expect(report.passed).toEqual(
+      expect.arrayContaining([
+        'An empty form is not accepted (/)',
+        'Bad input is handled without errors (/)',
+        'A double click sends the form only once (/)',
+      ]),
+    );
+  });
+
   it('reports what works as working — no false alarms from the flows', () => {
     expect(report.passed).toEqual(
       expect.arrayContaining([

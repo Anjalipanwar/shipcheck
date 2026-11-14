@@ -39,6 +39,34 @@ const overflowsSideways = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 
 describe('buggy-app in a real browser', () => {
+  it('#11 a double click sends the contact form twice — but the newsletter form only once', async () => {
+    const contact = await open('/contact.html', DESKTOP);
+    await contact.getByLabel('Your name').fill('Double Click');
+    const contactBefore = app.hits.contact;
+    await contact.getByRole('button', { name: 'Send message' }).dblclick();
+    await contact.getByText('Thanks!').waitFor();
+    await contact.waitForTimeout(300);
+    expect(app.hits.contact - contactBefore).toBe(2);
+    await context?.close();
+
+    const home = await open('/', DESKTOP);
+    const button = home.getByRole('button', { name: 'Keep me posted' });
+    const newsletterBefore = app.hits.newsletter;
+    // Works on purpose: empty and invalid addresses are refused…
+    await button.click();
+    await home.getByLabel('Email address').fill('not-an-email');
+    await button.click();
+    await home.waitForTimeout(300);
+    expect(app.hits.newsletter).toBe(newsletterBefore);
+    // …and a double click with a valid one sends exactly one request.
+    await home.getByLabel('Email address').fill('shipcheck+news@example.com');
+    await button.dblclick();
+    await home.getByText('You are on the list.').waitFor();
+    await home.waitForTimeout(300);
+    expect(app.hits.newsletter - newsletterBefore).toBe(1);
+    expect(await button.isDisabled()).toBe(true);
+  });
+
   it('#1 signup works on desktop but the button does nothing on a phone', async () => {
     const account = { email: 'shipcheck+desktop@example.com', password: 'longenough1' };
 

@@ -40,6 +40,8 @@ export interface FixtureHits {
   login: number;
   loginFailed: number;
   contact: number;
+  /** Accepted newsletter sign-ups. The form disables its button, so a double click gives 1. */
+  newsletter: number;
 }
 
 export interface ContactSubmission {
@@ -135,6 +137,7 @@ export async function startFixtureServer(): Promise<FixtureServer> {
     login: 0,
     loginFailed: 0,
     contact: 0,
+    newsletter: 0,
   };
   const contactSubmissions: ContactSubmission[] = [];
   const requests: string[] = [];
@@ -183,6 +186,14 @@ export async function startFixtureServer(): Promise<FixtureServer> {
           email: text(body.email),
           message: text(body.message),
         });
+        return sendJson(res, 200, { ok: true });
+      }
+      case '/api/newsletter': {
+        // Works on purpose: the server validates too.
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(text(body.email).trim())) {
+          return sendJson(res, 400, { ok: false, error: 'Please enter a valid email address.' });
+        }
+        hits.newsletter += 1;
         return sendJson(res, 200, { ok: true });
       }
       case '/api/delete-account': {

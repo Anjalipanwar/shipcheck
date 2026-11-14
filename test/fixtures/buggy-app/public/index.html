@@ -33,11 +33,22 @@
           <li>Free for personal use.</li>
         </ul>
       </section>
+      <section>
+        <h2>Get product news</h2>
+        <!-- Works on purpose: validates its input and cannot be sent twice (see BUGS.md). -->
+        <form id="newsletter-form" class="card">
+          <label for="newsletter-email">Email address</label>
+          <input id="newsletter-email" name="email" type="email" autocomplete="email" required />
+          <p id="newsletter-message" class="message" role="status"></p>
+          <button id="newsletter-button" class="button" type="submit">Keep me posted</button>
+        </form>
+      </section>
     </main>
     <footer class="site-footer">
       <p>NoteNest is a pretend app used to test ShipCheck. Nothing here is real.</p>
     </footer>
     <script src="/assets/app.js"></script>
+    <script src="/assets/newsletter.js"></script>
     <script src="/assets/landing.js"></script>
   </body>
 </html>

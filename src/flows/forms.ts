@@ -302,6 +302,21 @@ export const formsFlow: FlowBody = async (ctx) => {
         fixPrompt: `The form on ${url} is submitted twice when its button is double-clicked. Please disable the button while the request is running and ignore further submits until it has finished.`,
         confidence: 'verified',
       });
+    } else if (double && double.accepted.length === 1) {
+      ctx.record({
+        ...base,
+        rule: 'forms/single-submit',
+        ok: true,
+        title: `A double click sends the form only once (${new URL(url).pathname})`,
+        expected: 'A quick double click sends the form once.',
+        actual: 'The form was sent once.',
+        severity: 'info',
+        whyItMatters: '',
+        steps: [],
+        screenshots: [],
+        logs: [],
+        confidence: 'verified',
+      });
     }
   }
   if (tested === 0) {

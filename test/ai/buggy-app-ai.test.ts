@@ -55,6 +55,18 @@ describe.skipIf(!model)('real AI run against buggy-app (M4 acceptance)', () => {
     expect(app.contactSubmissions.some((s) => s.email === '' || s.name.length === 5000)).toBe(true);
   });
 
+  it('detects planted bug #11 (double click sends the contact form twice) only there', () => {
+    const duplicates = report.findings.filter((f) => f.rule === 'forms/duplicate-submit');
+    expect(duplicates.map((f) => [f.severity, f.evidence.url])).toEqual([
+      ['minor', `${app.url}/contact.html`],
+    ]);
+    // Opposite case: the newsletter form disables its button, so one sign-up at most.
+    expect(app.hits.newsletter).toBeLessThanOrEqual(1);
+    for (const finding of report.findings.filter((f) => f.rule.startsWith('forms/'))) {
+      expect(finding.evidence.url).toBe(`${app.url}/contact.html`);
+    }
+  });
+
   it('never hits the delete counter (#9) and never submits checkout or card data (#10)', () => {
     expect(app.hits).toMatchObject({ deleteAccount: 0, checkoutSubmit: 0, cardDataReceived: 0 });
   });

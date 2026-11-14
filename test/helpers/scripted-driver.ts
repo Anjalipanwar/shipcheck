@@ -75,12 +75,18 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
             click('xpath=//form[@id="login-form"]//button', 'Log in button'),
           ];
         case PROMPTS.formFields:
-          return path(page) === '/contact.html'
+          if (path(page) === '/contact.html') {
+            return [
+              fill(byId('contact-name'), 'Name field'),
+              fill(byId('contact-email'), 'Email field'),
+              fill(byId('contact-message'), 'Message field'),
+              click('xpath=//form[@id="contact-form"]//button', 'Send message button'),
+            ];
+          }
+          return path(page) === '/'
             ? [
-                fill(byId('contact-name'), 'Name field'),
-                fill(byId('contact-email'), 'Email field'),
-                fill(byId('contact-message'), 'Message field'),
-                click('xpath=//form[@id="contact-form"]//button', 'Send message button'),
+                fill(byId('newsletter-email'), 'Newsletter email field'),
+                click(byId('newsletter-button'), 'Keep me posted button'),
               ]
             : [];
         default: {
