@@ -15,7 +15,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
 | M3 — Report renderer and verdict                     | done        | `8e0b406` | yes    |
 | M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63` | yes    |
-| M5 — Mobile pass                                     | done        | _see M5_  | no     |
+| M5 — Mobile pass                                     | done        | `f168b9e` | no     |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
 | M7 — CLI polish                                      | not started | —         | —      |
 | M8 — GitHub Action                                   | not started | —         | —      |
@@ -211,7 +211,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 ## M5 — Mobile pass
 
 - **Status:** done
-- **Commit:** _filled in after committing_
+- **Commit:** `f168b9e`
 - **Pushed:** no — waiting for the owner's answer
 
 **What was built:** the phone-sized pass (iPhone, 390×844, touch, mobile browser identity).
