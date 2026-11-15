@@ -33,6 +33,10 @@ These must not show up as issues (they guard against false alarms):
 
 - `/menu-ok.html` has the same phone menu as `/menu-broken.html`, but working: tapping "Menu" shows the links and sets `aria-expanded="true"`. A run started there lists "The menu opens on a phone" under what worked and reports no menu problem. Both menu pages fit a phone, have no covered, cut-off or too-small buttons, and are not linked from other pages (existing pages stay unchanged — owner, 2026-11-15).
 
+- `/late-signup.html` (not linked from any page) is a sign-up that **works**, slowly: after the server has created the account the page shows "Signing you in…" for 4.5 seconds and only then opens the dashboard. A tester that judges the loading screen reports a false "New users cannot sign up". Must produce no finding. With the server option `rejectAllSignups` the same page is really broken and must be reported (control).
+- `/tracked-form.html` (not linked from any page) is a contact form that **works**: the page refuses empty and invalid input itself and ignores a double click. Every click also sends a tracking beacon (`POST /api/track`, answered 202), as analytics tools do. A tester that takes any accepted request for "the form was accepted" reports false alarms here. Must produce no finding for this page.
+- The main-feature flow must never sign up or log in by itself: if the AI heads for a password field, ShipCheck stops and reports "Not tested" with the advice to add a test account — no account is created with made-up details.
+
 ## Not planted, but expected anyway
 
 The fixture server sends no security headers, so the security-header check will report missing headers (Minor).

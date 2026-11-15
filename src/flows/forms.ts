@@ -1,4 +1,5 @@
 import { PROMPTS } from '../ai/prompts.js';
+import { isFormRequest } from '../browser/body-keys.js';
 import { isRiskyUrl } from '../browser/guard.js';
 import { causedByShipCheck } from '../checks/blocked.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
@@ -65,7 +66,23 @@ interface Attempt {
   blocked: boolean;
 }
 
-/** Clicks submit and reports what the app did with it, measured from the network and the page. */
+/** The names and ids of the fields of the form the button belongs to. */
+const formKeys = (ctx: FlowContext, button: Field): Promise<string[]> =>
+  ctx.page
+    .locator(button.action.selector)
+    .evaluate((el) =>
+      [...(el.closest('form') ?? document).querySelectorAll('input, textarea, select')]
+        .filter((field) => (field as HTMLInputElement).type !== 'hidden')
+        .flatMap((field) => [field.getAttribute('name') ?? '', field.id])
+        .filter(Boolean),
+    )
+    .catch(() => []);
+
+/**
+ * Clicks submit and reports what the app did with it, measured from the network and the page.
+ * Only the form's own request counts as "accepted": a tracking beacon sent by the same click
+ * says nothing about the form (lesson from a real-app run, SPEC §13 2026-11-15).
+ */
 async function submit(
   ctx: FlowContext,
   button: Field,
@@ -75,6 +92,7 @@ async function submit(
   const before = await ctx.snapshot();
   const eventsBefore = ctx.evidence.events.length;
   const held = await browserBlocks(ctx);
+  const keys = await formKeys(ctx, button);
   const result = await ctx.perform(
     twice ? { ...click(button), method: 'doubleClick' } : click(button),
     intent,
@@ -84,7 +102,9 @@ async function submit(
   const fresh = ctx.evidence.events.slice(eventsBefore);
   return {
     accepted: fresh.flatMap((e) =>
-      e.kind === 'write-response' && e.status < 400 ? [`${e.method} ${e.url} → ${e.status}`] : [],
+      e.kind === 'write-response' && e.status < 400 && isFormRequest(e, keys)
+        ? [`${e.method} ${e.url} → ${e.status}`]
+        : [],
     ),
     message: FlowContext.newText(before, after),
     crashed: fresh.some(

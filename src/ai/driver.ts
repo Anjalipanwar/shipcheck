@@ -20,6 +20,11 @@ export interface AiDriver {
   act(page: Page, action: ProposedAction): Promise<{ success: boolean; message: string }>;
   /** Asks the model to describe what is visible, as data of the given shape. Two AI calls. */
   extract<T extends z.ZodObject>(page: Page, instruction: string, schema: T): Promise<z.infer<T>>;
+  /**
+   * Asks the model a question that needs no page (the judge's rewording). One AI call, counted
+   * and limited like every other.
+   */
+  ask<T extends z.ZodObject>(instruction: string, schema: T): Promise<z.infer<T>>;
   close(): Promise<void>;
 }
 
@@ -93,6 +98,21 @@ export async function createStagehandDriver(options: {
     async extract(page, instruction, schema) {
       options.budget.check();
       return (await stagehand.extract(instruction, schema as never, { page })) as never;
+    },
+    async ask(instruction, schema) {
+      options.budget.check();
+      // Stagehand's own client: the AI SDK's generateObject with the model that carries our
+      // counting middleware (verified in the installed types, see docs/notes/stagehand.md).
+      const client = stagehand.llmClient;
+      const model = client.getLanguageModel?.();
+      if (!model) throw new Error('this model cannot be asked directly');
+      // The SDK's overloads do not resolve for a schema type that is only known at run time.
+      const { object } = await client.generateObject({
+        model,
+        schema,
+        prompt: instruction,
+      } as never);
+      return object as never;
     },
     async close() {
       await stagehand.close().catch(() => undefined);

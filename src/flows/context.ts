@@ -269,6 +269,23 @@ export class FlowContext {
     await this.page.waitForTimeout(QUIET_MS).catch(() => undefined);
   }
 
+  /**
+   * Waits until the page has moved to another address, at most `capMs`. For apps that show a
+   * loading label after a successful request and only then move on: judging before that would
+   * call a working step broken (lesson from a real-app run, SPEC §13 2026-11-15).
+   */
+  async waitForAddressChange(from: string, capMs: number): Promise<boolean> {
+    const end = Math.min(Date.now() + capMs, this.deps.deadline);
+    while (Date.now() < end) {
+      if (this.page.url() !== from) {
+        await this.settle();
+        return true;
+      }
+      await this.page.waitForTimeout(250).catch(() => undefined);
+    }
+    return this.page.url() !== from;
+  }
+
   async snapshot(): Promise<Snapshot> {
     const pages = this.page.context().pages().length;
     try {

@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, coverage box (four states) + password fix committed; M6 started
-- **Next up:** M6 (owner said "go" on 2026-11-15). Start with the false-alarm fixture (see `docs/BUILD_PLAN.md`). Ask the owner about pushing the coverage-box commit. Five wording/behaviour choices are still waiting for the owner's answer (see "Honest verdicts" section).
+- **Last updated:** 2026-11-15, M6 built (judge, three false-alarm fixes, rate-limit patience)
+- **Next up:** owner reviews M6 → "go" for M7. Open: push of the local commits (`78eb04b`, `64c27f1`, M6).
 
 ## Overview
 
@@ -348,6 +348,24 @@ The owner's own app (address and report kept outside this public repo, as agreed
 - Real-key runs approved: one on the fixture for M6; after M6 one re-run on the owner's app (summary only, nothing about it in the repo).
 - Still true until M9/M10: the `npx @anjalipanwar/shipcheck …` command works only after the npm release, and the README sections the report points to are written in M9.
 - **Not yet answered:** push of `78eb04b` and the commit after it.
+
+---
+
+## M6 — AI judge, fix prompts, dedupe
+
+- **Status:** built and verified with the scripted model; real-key run on the fixture and re-run on the owner's app: see below
+- **Commit:** see the overview table
+- **Pushed:** no — the owner has not answered the push question yet (`78eb04b`, `64c27f1` and the M6 commits are local)
+
+**What was built**
+
+1. **Three false alarms from the real-app run, reproduced first (tests red), then fixed where the observation is made:** a sign-up that works but redirects late (`/late-signup.html`); a tracking beacon taken for "the form was accepted" (`/tracked-form.html`); the main-feature flow signing up by itself with made-up details. Rule: a Blocker needs proof of failure; missing proof of success is "Not tested". Control: a sign-up the server really refuses is still a Blocker.
+2. **The judge** (`src/ai/judge.ts`, prompt in `src/ai/prompts.ts`): in code — no evidence → no finding, near-duplicates merged, "What worked" without duplicates; with the model — one batched call that rewords AI-seen findings into plain English with a fix prompt. The model can only reword; it cannot change severity, evidence, or the list of findings. Any failure keeps the recorded wording.
+3. **Rate limits:** longer retries (over a minute in total), a slower pace after the first "too many requests", no waiting for daily limits.
+
+**How it was verified:** see the numbers in the overview table; deliberate breakages for the judge (5), the request matching (1) and — earlier, by running the tests before each fix — all three false alarms.
+
+**Off-spec / decisions (SPEC §13, 2026-11-15 M6):** the judge does not set severity (the code does); every planted fixture bug is a measured finding, so in a fixture run the judge's model call happens only for AI-seen problems.
 
 ---
 

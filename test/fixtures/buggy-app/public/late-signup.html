@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create your account (late redirect) — NoteNest</title>
+    <meta name="description" content="NoteNest test fixture page." />
+    <meta property="og:title" content="NoteNest" />
+    <meta property="og:description" content="NoteNest test fixture page." />
+    <meta property="og:image" content="/og.svg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">NoteNest</a>
+      <nav aria-label="Main">
+        <a href="/features.html">Features</a>
+        <a href="/pricing.html">Pricing</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/login.html">Log in</a>
+        <a class="button small" href="/signup.html">Sign up</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Create your account</h1>
+      <form id="signup-form" class="card" novalidate>
+        <label for="signup-email">Email</label>
+        <input id="signup-email" name="email" type="email" autocomplete="email" />
+        <label for="signup-password">Password</label>
+        <input id="signup-password" name="password" type="password" autocomplete="new-password" />
+        <p id="signup-message" class="message" role="status"></p>
+        <button id="signup-button" class="button" type="button">Create account</button>
+      </form>
+    </main>
+    <footer class="site-footer">
+      <p>NoteNest is a pretend app used to test ShipCheck. Nothing here is real.</p>
+    </footer>
+    <script src="/assets/app.js"></script>
+    <script src="/assets/late-signup.js"></script>
+  </body>
+</html>

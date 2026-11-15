@@ -30,6 +30,8 @@ export interface ScriptedOptions {
   nextStep?: (page: Page, done: number) => ProposedAction[];
   /** Pretends the app has no sign-up and no log-in: the AI finds neither a link nor a form. */
   noAccounts?: boolean;
+  /** The judge's answer (reworded findings) for the given instruction. */
+  judge?: (instruction: string) => unknown;
   /** Replaces the answer for "what is this app's main action". */
   goal?: string;
 }
@@ -72,7 +74,7 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
             click(navLink('/pricing.html'), 'Menu link Pricing'),
           ];
         case PROMPTS.signupEntry:
-          return path(page) === '/signup.html'
+          return ['/signup.html', '/late-signup.html'].includes(path(page))
             ? []
             : [click(navLink('/signup.html'), 'Sign up link')];
         case PROMPTS.signupForm:
@@ -90,7 +92,7 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
             click('xpath=//form[@id="login-form"]//button', 'Log in button'),
           ];
         case PROMPTS.formFields:
-          if (path(page) === '/contact.html') {
+          if (['/contact.html', '/tracked-form.html'].includes(path(page))) {
             return [
               fill(byId('contact-name'), 'Name field'),
               fill(byId('contact-email'), 'Email field'),
@@ -150,7 +152,8 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
         } as never;
       }
       if (instruction === PROMPTS.signupOutcome) {
-        const error = /valid email|at least 8|already exists/.exec(text)?.[0] ?? '';
+        const error =
+          /valid email|at least 8|already exists|Something went wrong/.exec(text)?.[0] ?? '';
         return {
           accountCreated: path(page) === '/dashboard.html',
           needsEmailVerification: false,
@@ -158,11 +161,20 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
           errorText: error,
         } as never;
       }
+      // The main-feature outcome: like a model, it notices an error message on the page.
+      const failure = /valid email|at least 8 characters|already exists/.exec(text)?.[0];
       return {
         accomplished: false,
-        errorVisible: false,
-        whatIsVisible: 'Nothing changed.',
+        errorVisible: failure !== undefined,
+        whatIsVisible: failure ? `The page says: “${failure}”.` : 'Nothing changed.',
       } as never;
+    },
+
+    async ask(instruction) {
+      await options.budget?.run(async () => undefined);
+      observed.push(instruction);
+      // By default the scripted judge returns nothing, so the original wording stays.
+      return (options.judge?.(instruction) ?? { findings: [] }) as never;
     },
 
     async close() {

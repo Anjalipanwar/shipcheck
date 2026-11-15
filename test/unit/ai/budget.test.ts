@@ -10,7 +10,7 @@ const budget = (overrides: Partial<ConstructorParameters<typeof LlmBudget>[0]> =
   const clock = { now: 0 };
   const pauses: number[] = [];
   const instance = new LlmBudget({
-    deadline: 60_000,
+    deadline: 600_000,
     now: () => clock.now,
     sleep: async (ms) => {
       pauses.push(ms);
@@ -56,7 +56,7 @@ describe('LlmBudget', () => {
 
   it('refuses calls after the time limit', async () => {
     const { instance, clock } = budget();
-    clock.now = 60_000;
+    clock.now = 600_000;
     await expect(instance.run(async () => 1)).rejects.toMatchObject({ limit: 'time' });
     expect(instance.used).toBe(0);
   });
@@ -68,7 +68,7 @@ describe('LlmBudget', () => {
     expect(instance.used).toBe(1);
   });
 
-  it('retries "too many requests" twice with growing pauses, counting each attempt', async () => {
+  it('retries "too many requests" with growing pauses, counting each attempt', async () => {
     const { instance, pauses } = budget();
     let attempts = 0;
     const result = await instance.run(async () => {
@@ -79,7 +79,7 @@ describe('LlmBudget', () => {
     expect(result).toBe('ok');
     expect(attempts).toBe(3);
     expect(instance.used).toBe(3);
-    expect(pauses).toEqual([4000, 8000]);
+    expect(pauses).toEqual([5000, 15_000]);
   });
 
   it('gives up with "quota exhausted" when the service keeps refusing', async () => {
@@ -91,13 +91,56 @@ describe('LlmBudget', () => {
         throw tooMany();
       }),
     ).rejects.toBeInstanceOf(QuotaExhaustedError);
-    expect(attempts).toBe(3);
-    expect(instance.used).toBe(3);
+    expect(attempts).toBe(5);
+    expect(instance.used).toBe(5);
+  });
+
+  it('waits longer than a minute in total, so a per-minute limit has passed', async () => {
+    const { instance, pauses } = budget();
+    await expect(instance.run(async () => Promise.reject(tooMany()))).rejects.toBeInstanceOf(
+      QuotaExhaustedError,
+    );
+    expect(pauses.reduce((sum, ms) => sum + ms, 0)).toBeGreaterThan(60_000);
+  });
+
+  it('a limit per day is not waited for', async () => {
+    const { instance, pauses } = budget();
+    const daily = Object.assign(new Error('Quota exceeded: GenerateRequestsPerDayPerProject'), {
+      statusCode: 429,
+    });
+    await expect(instance.run(async () => Promise.reject(daily))).rejects.toBeInstanceOf(
+      QuotaExhaustedError,
+    );
+    expect(pauses).toEqual([]);
+    expect(instance.used).toBe(1);
+  });
+
+  it('after one "too many requests" the rest of the run leaves a gap between calls', async () => {
+    const { instance, pauses, clock } = budget();
+    let attempts = 0;
+    await instance.run(async () => {
+      attempts += 1;
+      if (attempts === 1) throw tooMany();
+      return 'ok';
+    });
+    pauses.length = 0;
+    await instance.run(async () => 'next'); // right after: waits out the gap
+    expect(pauses).toEqual([4000]);
+    clock.now += 10_000;
+    await instance.run(async () => 'later'); // long after: no wait
+    expect(pauses).toEqual([4000]);
+  });
+
+  it('a run that was never refused is not slowed down', async () => {
+    const { instance, pauses } = budget();
+    await instance.run(async () => 'a');
+    await instance.run(async () => 'b');
+    expect(pauses).toEqual([]);
   });
 
   it('does not wait past the time limit', async () => {
     const { instance, clock, pauses } = budget();
-    clock.now = 58_000;
+    clock.now = 598_000;
     await expect(instance.run(async () => Promise.reject(tooMany()))).rejects.toBeInstanceOf(
       QuotaExhaustedError,
     );

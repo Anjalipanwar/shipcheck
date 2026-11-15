@@ -5,8 +5,16 @@
  */
 
 export const DEFAULT_MAX_LLM_CALLS = 150;
-const MAX_RATE_LIMIT_RETRIES = 2;
-const BASE_BACKOFF_MS = 4000;
+/**
+ * Pauses after a "too many requests" answer. Free AI keys allow only a few requests per minute,
+ * so the pauses add up to more than a minute: by then the per-minute window has passed. (In a
+ * real run, two short retries were not enough and the main feature was never tested.)
+ */
+const RETRY_PAUSES_MS = [5_000, 15_000, 30_000, 45_000];
+/** After the first "too many requests", the rest of the run leaves this gap between calls. */
+const SLOW_GAP_MS = 4_000;
+/** A limit per day does not pass by waiting a minute. */
+const DAILY_LIMIT = /per ?day|daily|PerDay/i;
 
 export class BudgetExceededError extends Error {
   override name = 'BudgetExceededError';
@@ -64,6 +72,8 @@ export class LlmBudget {
   private total = 0;
   private readonly byFlow = new Map<string, number>();
   private flow = 'setup';
+  private slow = false;
+  private lastCall = Number.NEGATIVE_INFINITY;
   private readonly deadline: number;
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -104,18 +114,29 @@ export class LlmBudget {
   }
 
   /**
-   * Sends one model request through the budget. "Too many requests" answers are retried twice
-   * with a growing, randomised pause (SPEC §8); every attempt counts as a call.
+   * Sends one model request through the budget. "Too many requests" answers are retried up to
+   * four times with growing, randomised pauses (SPEC §8), and the run slows down afterwards;
+   * every attempt counts as a call.
    */
   async run<T>(call: () => PromiseLike<T>): Promise<T> {
     for (let attempt = 0; ; attempt += 1) {
+      // Once the service has complained, keep a gap between calls for the rest of the run.
+      const wait = this.lastCall + SLOW_GAP_MS - this.now();
+      if (this.slow && attempt === 0 && wait > 0 && this.now() + wait < this.deadline) {
+        await this.sleep(wait);
+      }
       this.take();
+      this.lastCall = this.now();
       try {
         return await call();
       } catch (error) {
         if (!isRateLimitError(error)) throw error;
-        const pause = BASE_BACKOFF_MS * 2 ** attempt * (0.5 + this.random());
-        if (attempt >= MAX_RATE_LIMIT_RETRIES || this.now() + pause >= this.deadline) {
+        this.slow = true;
+        const base = RETRY_PAUSES_MS[attempt];
+        const message = (error as { message?: unknown }).message;
+        const daily = typeof message === 'string' && DAILY_LIMIT.test(message);
+        const pause = (base ?? 0) * (0.75 + this.random() / 2);
+        if (base === undefined || daily || this.now() + pause >= this.deadline) {
           throw new QuotaExhaustedError();
         }
         await this.sleep(pause);

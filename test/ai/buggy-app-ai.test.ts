@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { hasJargon } from '../../src/ai/judge.js';
 import { chooseModel, type ModelChoice } from '../../src/ai/models.js';
 import { loadConfig } from '../../src/config.js';
 import { ReportSchema, type Report } from '../../src/report/schema.js';
@@ -43,6 +44,13 @@ describe.skipIf(!model)('real AI run against buggy-app (M4 acceptance)', () => {
   });
 
   const rules = () => report.findings.map((f) => f.rule);
+
+  it('M6: every finding title is plain language, and “What worked” has no duplicates', () => {
+    for (const finding of report.findings) {
+      expect(hasJargon(finding.title), finding.title).toBe(false);
+    }
+    expect(new Set(report.passed).size).toBe(report.passed.length);
+  });
 
   it('detects planted bug #7 (no message on a wrong password)', () => {
     expect(rules()).toContain('login/no-error-on-wrong-password');

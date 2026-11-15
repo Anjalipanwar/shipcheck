@@ -26,6 +26,7 @@ import { checkSecrets, type SecretSource } from './checks/secrets.js';
 import { checkSeo } from './checks/seo.js';
 import type { CheckResult } from './checks/types.js';
 import type { Config } from './config.js';
+import { judge } from './ai/judge.js';
 import {
   CoverageRecorder,
   flowOutcome,
@@ -504,6 +505,25 @@ export async function runShipCheck(
     await step('Hidden errors', 'errors', () =>
       checkErrors(separateShipCheckBlocking(evidence.events).app),
     );
+
+    // The judge (SPEC §8 step 7): no evidence → no finding, near-duplicates merged, and — in a
+    // full check — one model call that rewords what the AI saw into plain English.
+    budget.setFlow('judge');
+    const driver = ai;
+    const judged = await judge(
+      collector.findings,
+      driver ? (instruction, schema) => driver.ask(instruction, schema) : undefined,
+    );
+    collector.findings.splice(0, collector.findings.length, ...judged.findings);
+    for (const title of judged.withoutEvidence) {
+      collector.notTested.push(
+        `A possible problem (“${title}”) — left out of the report, because ShipCheck has no evidence for it`,
+      );
+    }
+    const worked = [...new Set(collector.passed)];
+    collector.passed.splice(0, collector.passed.length, ...worked);
+    if (driver)
+      progress(`Writing up the findings… ${judged.reworded > 0 ? '✓' : 'kept as recorded'}`);
   } finally {
     await ai?.close();
     await session.close();

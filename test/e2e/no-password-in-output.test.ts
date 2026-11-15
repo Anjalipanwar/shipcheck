@@ -8,7 +8,7 @@ import { loadConfig } from '../../src/config.js';
 import { renderStepSummary } from '../../src/report/markdown.js';
 import { writeReport } from '../../src/report/write.js';
 import { runShipCheck } from '../../src/runner.js';
-import { startFixtureServer } from '../helpers/fixture-server.js';
+import { DEMO_ACCOUNT, startFixtureServer } from '../helpers/fixture-server.js';
 import { createScriptedDriver } from '../helpers/scripted-driver.js';
 
 /**
@@ -32,17 +32,6 @@ const inventsPassword = (page: Page, done: number): ProposedAction[] => {
     ];
   }
   if (path !== '/login.html' || done > 3) return [];
-  if (done >= 2) {
-    // …and then a very short one: too short to scrub from all text, but never shown as typed.
-    return [
-      {
-        selector: 'xpath=//*[@id="login-password"]',
-        description: 'Password field',
-        method: 'fill',
-        arguments: [SHORT],
-      },
-    ];
-  }
   return [
     {
       selector: 'xpath=//*[@id="login-password"]',
@@ -79,8 +68,11 @@ describe('passwords never reach any output', () => {
             .map((action) => action.arguments?.[0] ?? ''),
         ),
       ].filter(Boolean);
-      expect(typed).toContain(INVENTED);
-      expect(typed.length).toBeGreaterThanOrEqual(3); // sign-up's own, a wrong one, the invented one
+      // The main-feature flow refuses to type into a password field at all, so the invented
+      // one is never sent — but the model's own description of the step still names it.
+      expect(typed).not.toContain(INVENTED);
+      expect(typed.length).toBeGreaterThanOrEqual(2); // sign-up's own and a wrong one on purpose
+      typed.push(INVENTED);
 
       await writeReport(outDir, result.report, result.screenshots, result.redact);
       const files = (await readdir(outDir, { recursive: true })).filter((name) =>
@@ -103,16 +95,6 @@ describe('passwords never reach any output', () => {
           expect(text.includes(password), `${name} contains a password`).toBe(false);
         }
       }
-      // Whatever was typed into a password field is shown as hidden, whatever its length.
-      expect(typed).toContain(SHORT);
-      const passwordSteps = result.report.actionLog.filter(
-        (entry) => entry.action === 'fill' && /password/.test(entry.locator ?? ''),
-      );
-      expect(passwordSteps.length).toBeGreaterThanOrEqual(4);
-      expect(new Set(passwordSteps.map((entry) => entry.value))).toEqual(new Set(['[hidden]']));
-      const json = outputs.find(([name]) => name === 'report.json')?.[1] ?? '';
-      expect(json).not.toContain(`"${SHORT}"`);
-      expect(json).not.toContain(`“${SHORT}”`);
       // The step itself is still on record — with the value hidden.
       expect(
         result.report.actionLog.some(
@@ -121,6 +103,38 @@ describe('passwords never reach any output', () => {
       ).toBe(true);
     } finally {
       await rm(outDir, { recursive: true, force: true });
+      await app.close();
+    }
+  });
+
+  it('a field where ShipCheck typed a password is shown as hidden, however short the password is', async () => {
+    const app = await startFixtureServer();
+    try {
+      // Too short to be scrubbed from all text (that would damage ordinary words).
+      const result = await runShipCheck(
+        loadConfig(
+          app.url,
+          {
+            yes: true,
+            flows: 'login',
+            skipMobile: true,
+            email: DEMO_ACCOUNT.email,
+            password: SHORT,
+          },
+          {},
+        ),
+        {},
+        { aiDriver: (budget) => createScriptedDriver({ budget }) },
+      );
+      const passwordSteps = result.report.actionLog.filter(
+        (entry) => entry.action === 'fill' && /password/.test(entry.locator ?? ''),
+      );
+      expect(passwordSteps.length).toBeGreaterThanOrEqual(1);
+      expect(new Set(passwordSteps.map((entry) => entry.value))).toEqual(new Set(['[hidden]']));
+      const json = JSON.stringify(result.report);
+      expect(json).not.toContain(`"${SHORT}"`);
+      expect(json).not.toContain(`“${SHORT}”`);
+    } finally {
       await app.close();
     }
   });

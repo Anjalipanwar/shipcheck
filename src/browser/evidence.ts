@@ -1,3 +1,4 @@
+import { bodyKeys } from './body-keys.js';
 import type { BrowserContext, Page, Request } from 'playwright';
 import type { ActionLogEntry } from '../report/schema.js';
 import type { BackstopReason } from './backstop.js';
@@ -35,7 +36,14 @@ export type EvidenceEvent = {
       /** The request would have opened a new page in the main window (not a background call). */
       topLevel: boolean;
     }
-  | { kind: 'write-response'; url: string; method: string; status: number }
+  | {
+      kind: 'write-response';
+      url: string;
+      method: string;
+      status: number;
+      /** Field names in the request body — never the values. */
+      bodyKeys: string[];
+    }
   | { kind: 'dialog'; text: string; dialogType: string }
 );
 
@@ -182,6 +190,7 @@ export class Evidence {
             url: response.url(),
             method: request.method(),
             status: response.status(),
+            bodyKeys: bodyKeys(request.postData()),
           });
         }
         if (response.status() < 400) return;

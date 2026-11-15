@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROMPTS } from '../ai/prompts.js';
+import { isFormRequest } from '../browser/body-keys.js';
 import { ADVICE } from '../report/present.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
 import { click, fill, first, readFields } from './fields.js';
@@ -10,6 +11,9 @@ const OutcomeSchema = z.object({
   captchaBlocked: z.boolean(),
   errorText: z.string(),
 });
+
+/** How long to wait for the app to move on after the server accepted the sign-up. */
+const REDIRECT_WAIT_MS = 10_000;
 
 /** Flow 2 (SPEC §6.1): create an account with a generated test identity. */
 export const signupFlow: FlowBody = async (ctx) => {
@@ -66,13 +70,31 @@ export const signupFlow: FlowBody = async (ctx) => {
     else if (field.kind === 'checkbox') await ctx.perform(click(field), `Tick “${field.label}”`);
   }
   const email = ctx.config.email ?? identity.email;
+  const formKeys = fields
+    .filter((field) => field.kind !== 'submit')
+    .flatMap((field) => field.facts.name.split(/\s+/))
+    .filter(Boolean);
   const before = await ctx.snapshot();
+  const eventsBefore = ctx.evidence.events.length;
   const sent = await ctx.perform(click(submit), `Click “${submit.label}” to create the account`);
   if (sent.status === 'blocked') {
     ctx.skip(`Signing up — ShipCheck did not press “${submit.label}” (${sent.reason})`);
     return;
   }
-  const after = await ctx.snapshot();
+  let after = await ctx.snapshot();
+  // What the server said to the sign-up request itself (not to tracking beacons).
+  const answers = () =>
+    ctx.evidence.events
+      .slice(eventsBefore)
+      .flatMap((e) => (e.kind === 'write-response' && isFormRequest(e, formKeys) ? [e] : []));
+  const refused = () => answers().some((e) => e.status >= 400);
+  const acceptedByServer = () => !refused() && answers().some((e) => e.status < 400);
+  // The server said yes but the page has not moved on yet: many apps show "Signing you in…"
+  // first. Wait for the new page instead of judging the loading screen.
+  if (after.url === before.url && acceptedByServer()) {
+    await ctx.waitForAddressChange(before.url, REDIRECT_WAIT_MS);
+    after = await ctx.snapshot();
+  }
   const steps = [
     `Open ${formUrl}.`,
     `Fill in the sign-up form with a new email address (ShipCheck used ${email}) and a password of 20 characters.`,
@@ -143,6 +165,17 @@ export const signupFlow: FlowBody = async (ctx) => {
       logs: [],
       confidence,
     });
+  } else if (!outcome.errorText && !refused() && acceptedByServer()) {
+    // No error on screen and the server accepted the request: calling this "broken" would be
+    // a guess. A Blocker needs proof of failure, not missing proof of success.
+    ctx.skip(
+      'Signing up — the form was sent and the app accepted it, but ShipCheck could not confirm that the new user ends up inside the app. Please check it by hand, or give ShipCheck a test account with --email and --password',
+      {
+        reason:
+          'the sign-up form was accepted, but ShipCheck could not confirm that it let the new user in',
+        action: ADVICE.account,
+      },
+    );
   } else {
     const shot = await ctx.shot('signup failed');
     const message = outcome.errorText || FlowContext.newText(before, after);

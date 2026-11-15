@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROMPTS } from '../ai/prompts.js';
+import { readElementFacts } from '../browser/element.js';
 import { ADVICE } from '../report/present.js';
 import type { FlowBody } from './context.js';
 
@@ -34,6 +35,7 @@ export const coreFlow: FlowBody = async (ctx) => {
   const typed: string[] = [];
   const textAtStart = (await ctx.snapshot()).text;
   let refusals = 0;
+  let wall = false;
   let previous = '';
   for (let step = 0; step < MAX_GOAL_STEPS; step += 1) {
     const next = (await ctx.observe(PROMPTS.nextStep(goal, done)))[0];
@@ -42,6 +44,15 @@ export const coreFlow: FlowBody = async (ctx) => {
     const signature = `${next.method}|${next.selector}|${next.arguments?.join('|') ?? ''}`;
     if (signature === previous) break;
     previous = signature;
+    // The main-feature flow never signs up or logs in by itself. A password field on the way
+    // means the feature is behind an account; making up details there creates junk accounts and
+    // gets refused for reasons that say nothing about the feature (SPEC §13, 2026-11-15).
+    const target = await readElementFacts(ctx.page, next.selector);
+    if (target?.type === 'password') {
+      ctx.evidence.protect(next.arguments?.[0]); // whatever the model made up is never shown
+      wall = true;
+      break;
+    }
     const result = await ctx.perform(next, next.description);
     if (result.status === 'blocked') {
       refusals += 1;
@@ -63,6 +74,16 @@ export const coreFlow: FlowBody = async (ctx) => {
     done.push(isText && value ? `typed ${shown} into ${next.description}` : next.description);
   }
 
+  if (wall) {
+    ctx.skip(
+      'Main feature — the app asks for an account before it can be used, and ShipCheck was not logged in. Give ShipCheck a test account with --email and --password',
+      {
+        reason: 'your app asks to sign up or log in first, and ShipCheck had no working account',
+        action: ADVICE.account,
+      },
+    );
+    return;
+  }
   const performed = done.filter((line) => !/^(not allowed|could not do)/.test(line));
   if (performed.length === 0) {
     ctx.skip(

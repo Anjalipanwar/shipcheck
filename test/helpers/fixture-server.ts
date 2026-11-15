@@ -37,6 +37,8 @@ export interface FixtureHits {
   /** Checkout POSTs that carried any digits in the card number field. Must stay 0. */
   cardDataReceived: number;
   signup: number;
+  /** Tracking beacons received (/tracked-form.html). */
+  track: number;
   login: number;
   loginFailed: number;
   contact: number;
@@ -131,6 +133,8 @@ export interface FixtureOptions {
    * are not counted as failed background requests.
    */
   rejectAllLogins?: boolean;
+  /** Sign-up is broken on the server: every attempt is answered with an error. */
+  rejectAllSignups?: boolean;
 }
 
 /**
@@ -147,6 +151,7 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
     loginFailed: 0,
     contact: 0,
     newsletter: 0,
+    track: 0,
   };
   const contactSubmissions: ContactSubmission[] = [];
   const requests: string[] = [];
@@ -158,6 +163,12 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
     switch (path) {
       case '/api/signup': {
         hits.signup += 1;
+        if (options.rejectAllSignups) {
+          return sendJson(res, 500, {
+            ok: false,
+            error: 'Something went wrong. Please try again.',
+          });
+        }
         const email = text(body.email).trim().toLowerCase();
         const password = text(body.password);
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
@@ -205,6 +216,11 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
         }
         hits.newsletter += 1;
         return sendJson(res, 200, { ok: true });
+      }
+      case '/api/track': {
+        // A tracking beacon, as on /tracked-form.html: always answered, means nothing.
+        hits.track += 1;
+        return sendJson(res, 202, { ok: true });
       }
       case '/api/delete-account': {
         hits.deleteAccount += 1;

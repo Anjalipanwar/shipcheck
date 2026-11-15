@@ -269,6 +269,7 @@ describe('safety (SPEC §7)', () => {
       loginFailed: 0,
       contact: 0,
       newsletter: 0,
+      track: 0,
     });
     expect(app.requests.filter((r) => !r.startsWith('GET ') && !r.startsWith('HEAD '))).toEqual([]);
   });
