@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Week plan — NoteNest</title>
+    <meta name="description" content="NoteNest test fixture page." />
+    <meta property="og:title" content="NoteNest" />
+    <meta property="og:description" content="NoteNest test fixture page." />
+    <meta property="og:image" content="/og.svg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">NoteNest</a>
+      <nav aria-label="Main">
+        <a href="/features.html">Features</a>
+        <a href="/pricing.html">Pricing</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/login.html">Log in</a>
+        <a class="button small" href="/signup.html">Sign up</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Your week</h1>
+      <section class="card" aria-label="Monday">
+        <h2>Monday</h2>
+        <ul id="plan-monday"></ul>
+        <button class="button" type="button" data-add="monday">Add meal to Monday</button>
+      </section>
+      <section class="card" aria-label="Tuesday">
+        <h2>Tuesday</h2>
+        <ul id="plan-tuesday"></ul>
+        <button class="button" type="button" data-add="tuesday">Add meal to Tuesday</button>
+      </section>
+      <div id="picker" class="card" role="dialog" aria-modal="true" aria-label="Choose a recipe" style="display: none">
+        <h2>Choose a recipe</h2>
+        <button class="button" type="button" data-recipe="Rainbow chickpea bowls">Rainbow chickpea bowls <small>15 min</small></button>
+        <button class="button" type="button" data-recipe="Berry overnight oats">Berry overnight oats <small>5 min</small></button>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <p>NoteNest is a pretend app used to test ShipCheck. Nothing here is real.</p>
+    </footer>
+    <script src="/assets/app.js"></script>
+    <script src="/assets/planner.js"></script>
+  </body>
+</html>

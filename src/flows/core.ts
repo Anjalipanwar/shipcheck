@@ -14,6 +14,27 @@ const OutcomeSchema = z.object({
   whatIsVisible: z.string(),
 });
 
+const OPEN_DIALOG = '[role="dialog"]:visible, [role="alertdialog"]:visible, dialog[open]';
+
+/** How often `phrase` occurs in `text`. */
+const occurrences = (text: string, phrase: string): number => text.split(phrase).length - 1;
+
+/**
+ * The text of something chosen by a click, and the shorter phrases it starts with ("Rainbow
+ * chickpea bowls 15 min" → "Rainbow chickpea bowls 15", "Rainbow chickpea bowls"): the list the
+ * choice lands in often shows only the name. At least two words and eight characters, so that a
+ * common word cannot count as proof.
+ */
+function phrasesOf(label: string): string[] {
+  const words = label.replace(/\s+/g, ' ').trim().split(' ');
+  const phrases: string[] = [];
+  for (let length = words.length; length >= 2; length -= 1) {
+    const phrase = words.slice(0, length).join(' ');
+    if (phrase.length >= 8) phrases.push(phrase);
+  }
+  return phrases;
+}
+
 /** Flow 4 (SPEC §6.1): try the app's main action end to end, then check it survives a refresh. */
 export const coreFlow: FlowBody = async (ctx) => {
   if (!ctx.shared.loggedIn) await ctx.goto(ctx.homeUrl, 'Open the home page');
@@ -33,6 +54,9 @@ export const coreFlow: FlowBody = async (ctx) => {
 
   const done: string[] = [];
   const typed: string[] = [];
+  /** Choices clicked inside an open dialog (a recipe, a time slot…), with the page they were made on. */
+  const picked: { label: string; url: string }[] = [];
+  const dialogOpen = async () => (await ctx.page.locator(OPEN_DIALOG).count()) > 0;
   const textAtStart = (await ctx.snapshot()).text;
   let refusals = 0;
   let wall = false;
@@ -53,6 +77,7 @@ export const coreFlow: FlowBody = async (ctx) => {
       wall = true;
       break;
     }
+    const inDialog = await dialogOpen();
     const result = await ctx.perform(next, next.description);
     if (result.status === 'blocked') {
       refusals += 1;
@@ -63,6 +88,9 @@ export const coreFlow: FlowBody = async (ctx) => {
     if (result.status === 'failed') {
       done.push(`could not do: ${next.description}`);
       continue;
+    }
+    if (inDialog && (next.method ?? '').toLowerCase() === 'click' && result.facts?.text) {
+      picked.push({ label: result.facts.text, url: ctx.page.url() });
     }
     const value = next.arguments?.[0];
     const isText = ['fill', 'type'].includes((next.method ?? '').toLowerCase());
@@ -98,12 +126,41 @@ export const coreFlow: FlowBody = async (ctx) => {
   ];
   const base = { category: 'functional' as const, url: startUrl, steps };
 
+  // A dialog the last step left open would hide the result (and its text would be counted as
+  // the page's): close it the way a user would, with the Escape key, before judging.
+  if (await dialogOpen()) {
+    await ctx.page.keyboard.press('Escape').catch(() => undefined);
+    await ctx.settle();
+    ctx.evidence.logAction({
+      device: ctx.device,
+      flow: 'core',
+      intent: 'Close the open dialog (Escape key)',
+      action: 'press',
+      locator: 'keyboard: Escape',
+      url: ctx.page.url(),
+      result: (await dialogOpen()) ? 'failed' : 'ok',
+    });
+  }
+
   // Measured first: text the tester typed that now shows on the page (and did not before) is
-  // proof the action worked. Only without such proof is the model asked what it sees.
+  // proof the action worked. So is something chosen by a click in a dialog that now shows on
+  // the same page more often than at the start. Only without such proof is the model asked.
   const textNow = (await ctx.snapshot()).text;
-  const proof = typed.find((value) => textNow.includes(value) && !textAtStart.includes(value));
+  const typedProof = typed.find((value) => textNow.includes(value) && !textAtStart.includes(value));
+  const stillOpen = await dialogOpen();
+  const pickedProof = stillOpen
+    ? undefined
+    : picked
+        .filter((pick) => pick.url === ctx.page.url() && pick.url === startUrl)
+        .flatMap((pick) => phrasesOf(pick.label))
+        .find((phrase) => occurrences(textNow, phrase) > occurrences(textAtStart, phrase));
+  const proof = typedProof ?? pickedProof;
   let confidence: 'verified' | 'ai-judgement' = 'verified';
-  let seen = proof ? `“${proof}” now shows on the page.` : '';
+  let seen = typedProof
+    ? `“${typedProof}” now shows on the page.`
+    : pickedProof
+      ? `“${pickedProof}” was chosen and now shows on the page (${occurrences(textNow, pickedProof)} times, before: ${occurrences(textAtStart, pickedProof)}).`
+      : '';
   if (!proof) {
     const outcome = await ctx.extract(PROMPTS.goalOutcome(goal, performed), OutcomeSchema);
     confidence = 'ai-judgement';

@@ -148,6 +148,47 @@ describe('false alarms from the real-app run', () => {
     expect(menuTaps.map((a) => a.result)).toEqual(['ok', 'ok']);
   });
 
+  // A main feature used by clicking only: add a meal, choose a recipe in the dialog, open the
+  // dialog once more and leave it open (as the AI did in the real-app run).
+  const planSteps = (_page: Page, done: number): ProposedAction[] =>
+    [
+      'xpath=//button[@data-add="monday"]',
+      'xpath=//button[@data-recipe="Rainbow chickpea bowls"]',
+      'xpath=//button[@data-add="tuesday"]',
+    ]
+      .slice(done, done + 1)
+      .map((selector) => ({
+        selector,
+        description: 'Planner button',
+        method: 'click',
+        arguments: [],
+      }));
+
+  it('items added by clicking: the chosen item showing up on the page is proof the main feature works', async () => {
+    const { report } = await run(
+      '/planner.html',
+      'core',
+      {},
+      { nextStep: planSteps, goal: 'Plan a meal' },
+    );
+    // The scripted model never says "it worked", so this can only come from measured proof.
+    expect(report.passed).toContain('The main feature works: Plan a meal');
+    expect(report.coverage.find((e) => e.area === 'core')?.state).toBe('no-problems');
+    // The dialog the AI left open was closed before judging.
+    expect(report.actionLog.map((a) => a.intent)).toContain('Close the open dialog (Escape key)');
+  });
+
+  it('control: the chosen item does not show up on the page → no proof, “Not tested”', async () => {
+    const { report } = await run(
+      '/planner.html?broken=1',
+      'core',
+      {},
+      { nextStep: planSteps, goal: 'Plan a meal' },
+    );
+    expect(report.passed.join('\n')).not.toMatch(/main feature works/i);
+    expect(report.coverage.find((e) => e.area === 'core')?.state).toBe('not-tested');
+  });
+
   it('a tracking beacon is not “the server accepted the form”: a form that refuses bad input has no finding', async () => {
     const { report, hits } = await run('/tracked-form.html', 'forms');
     expect(hits.track).toBeGreaterThan(0); // the beacon did fire
