@@ -1,5 +1,5 @@
 import { PROMPTS } from '../ai/prompts.js';
-import { isFormRequest } from '../browser/body-keys.js';
+import { carriesTypedValue, isFormRequest } from '../browser/body-keys.js';
 import { isRiskyUrl } from '../browser/guard.js';
 import { causedByShipCheck } from '../checks/blocked.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
@@ -10,6 +10,10 @@ const MAX_FORMS = 3;
 const LONG_TEXT = 'A'.repeat(5000);
 const UNICODE_TEXT = '  Ünïcödé 😀 测试 — text with spaces around it  ';
 const BAD_EMAIL = 'not-an-email';
+const TEST_MESSAGE = 'This is an automated test message from ShipCheck. Please ignore it.';
+/** A message that tells the visitor the input was not accepted. */
+const REFUSAL =
+  /\b(please (enter|fill|provide|add|check|select|choose)|required|is missing|must (be|have|contain)|invalid|not valid|can(no|')t be (blank|empty)|too (short|long)|bitte|pflichtfeld|erforderlich|ungültig)\b/i;
 const FORM_PAGE_WORDS =
   /contact|kontakt|feedback|support|newsletter|subscribe|get in touch|waitlist|demo|anfrage/i;
 
@@ -87,26 +91,35 @@ async function submit(
   ctx: FlowContext,
   button: Field,
   intent: string,
+  typed: readonly string[] = [],
   twice = false,
 ): Promise<Attempt | undefined> {
   const before = await ctx.snapshot();
   const eventsBefore = ctx.evidence.events.length;
   const held = await browserBlocks(ctx);
   const keys = await formKeys(ctx, button);
+  ctx.evidence.watch(typed);
   const result = await ctx.perform(
     twice ? { ...click(button), method: 'doubleClick' } : click(button),
     intent,
   );
+  ctx.evidence.watch([]);
   if (result.status === 'blocked') return undefined;
   const after = await ctx.snapshot();
   const fresh = ctx.evidence.events.slice(eventsBefore);
+  const message = FlowContext.newText(before, after);
+  // With something typed, the form's own request is the one carrying it. With every field
+  // empty there is nothing to look for: the request must name the form's fields, and a page
+  // that answers "Please enter your name" has refused the form, whatever else was sent.
+  const own = (e: Extract<(typeof fresh)[number], { kind: 'write-response' }>): boolean =>
+    typed.length > 0 ? carriesTypedValue(e) : isFormRequest(e, keys) && !REFUSAL.test(message);
   return {
     accepted: fresh.flatMap((e) =>
-      e.kind === 'write-response' && e.status < 400 && isFormRequest(e, keys)
+      e.kind === 'write-response' && e.status < 400 && own(e)
         ? [`${e.method} ${e.url} → ${e.status}`]
         : [],
     ),
-    message: FlowContext.newText(before, after),
+    message,
     crashed: fresh.some(
       (e) => e.kind === 'page-error' && !causedByShipCheck(e, ctx.evidence.events),
     ),
@@ -208,7 +221,11 @@ export const formsFlow: FlowBody = async (ctx) => {
           `Type text with accents, emoji and extra spaces into “${field.label}”`,
         );
     }
-    const bad = await submit(ctx, button, `Click “${button.label}” with the bad input`);
+    const bad = await submit(ctx, button, `Click “${button.label}” with the bad input`, [
+      BAD_EMAIL,
+      LONG_TEXT,
+      UNICODE_TEXT.trim(),
+    ]);
     const longField = fields.find((field) => field.kind === 'name' || field.kind === 'text');
     if (bad?.crashed) {
       const shot = await ctx.shot('form crashed');
@@ -298,12 +315,15 @@ export const formsFlow: FlowBody = async (ctx) => {
       else if (field.kind === 'text')
         await ctx.perform(fill(field, 'ShipCheck test'), `Type test text into “${field.label}”`);
       else if (field.kind === 'longtext')
-        await ctx.perform(
-          fill(field, 'This is an automated test message from ShipCheck. Please ignore it.'),
-          `Type a test message into “${field.label}”`,
-        );
+        await ctx.perform(fill(field, TEST_MESSAGE), `Type a test message into “${field.label}”`);
     }
-    const double = await submit(ctx, button, `Click “${button.label}” twice quickly`, true);
+    const double = await submit(
+      ctx,
+      button,
+      `Click “${button.label}” twice quickly`,
+      [identity.email, identity.name, TEST_MESSAGE],
+      true,
+    );
     if (double && double.accepted.length >= 2) {
       const shot = await ctx.shot('sent twice');
       ctx.record({

@@ -35,7 +35,7 @@ export function bodyKeys(body: string | null | undefined): string[] {
 
 /** Addresses that collect statistics, not form data. Only used when the body says nothing. */
 const TRACKING_URL =
-  /(^|[/._-])(track(ing)?|analytics|collect|beacon|telemetry|metrics|events?|pixel|rum|vitals|log(s|ging)?|ingest)([/._?-]|$)/i;
+  /(^|[/._-])(track\w*|analytics|collect|beacon|telemetry|metrics|events?|pixel|rum|vitals|log(s|ging)?|ingest)([/._?-]|$)/i;
 
 const simple = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -62,4 +62,18 @@ export function isFormRequest(
     return !TRACKING_URL.test(path);
   }
   return form.some((key) => body.some((name) => name.includes(key) || key.includes(name)));
+}
+
+/**
+ * The same question when ShipCheck typed something into the form first: then the form's own
+ * request is the one that carries a typed value. Field names are not enough here — analytics
+ * events have a "name" too. Only when no body could be read does the address decide.
+ */
+export function carriesTypedValue(request: {
+  url: string;
+  bodyKeys?: readonly string[] | undefined;
+  echoes?: boolean | undefined;
+}): boolean {
+  if (request.echoes) return true;
+  return (request.bodyKeys ?? []).length === 0 && isFormRequest(request, []);
 }

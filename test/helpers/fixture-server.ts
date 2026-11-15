@@ -217,7 +217,7 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
         hits.newsletter += 1;
         return sendJson(res, 200, { ok: true });
       }
-      case '/api/track': {
+      case '/__t/trackevents': {
         // A tracking beacon, as on /tracked-form.html: always answered, means nothing.
         hits.track += 1;
         return sendJson(res, 202, { ok: true });
@@ -243,7 +243,7 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
     userAgents.push(req.headers['user-agent'] ?? '');
 
     const work =
-      path.startsWith('/api/') && method === 'POST'
+      (path.startsWith('/api/') || path === '/__t/trackevents') && method === 'POST'
         ? handleApi(path, req, res)
         : method === 'GET' || method === 'HEAD'
           ? serveStatic(path, res)

@@ -4,23 +4,23 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
 - **Last updated:** 2026-11-15, M6 built (judge, three false-alarm fixes, rate-limit patience)
-- **Next up:** owner reviews M6 → "go" for M7. Open: push of the local commits (`78eb04b`, `64c27f1`, M6).
+- **Next up:** owner reviews M6 → "go" for M7. Open questions: push of the local commits (`78eb04b`, `64c27f1`, `c2c651a` and the follow-up); a second re-run on the owner's app to confirm the two follow-up fixes; the judge's model call has not yet run with a real key.
 
 ## Overview
 
-| Milestone                                            | Status      | Commit    | Pushed |
-| ---------------------------------------------------- | ----------- | --------- | ------ |
-| M0 — Scaffold                                        | done        | `b59adfc` | yes    |
-| M1 — Fixture app with planted bugs                   | done        | `2d605ba` | yes    |
-| M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
-| M3 — Report renderer and verdict                     | done        | `8e0b406` | yes    |
-| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63` | yes    |
-| M5 — Mobile pass                                     | done        | `f168b9e` | yes    |
-| M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
-| M7 — CLI polish                                      | not started | —         | —      |
-| M8 — GitHub Action                                   | not started | —         | —      |
-| M9 — Docs and launch assets                          | not started | —         | —      |
-| M10 — Release                                        | not started | —         | —      |
+| Milestone                                            | Status                      | Commit                | Pushed |
+| ---------------------------------------------------- | --------------------------- | --------------------- | ------ |
+| M0 — Scaffold                                        | done                        | `b59adfc`             | yes    |
+| M1 — Fixture app with planted bugs                   | done                        | `2d605ba`             | yes    |
+| M2 — Browser session, evidence, deterministic checks | done                        | `6498102`             | yes    |
+| M3 — Report renderer and verdict                     | done                        | `8e0b406`             | yes    |
+| M4 — AI flows with Stagehand + safety guard          | done                        | `f5f7e63`             | yes    |
+| M5 — Mobile pass                                     | done                        | `f168b9e`             | yes    |
+| M6 — AI judge, fix prompts, dedupe                   | built, owner review pending | `c2c651a` + follow-up | no     |
+| M7 — CLI polish                                      | not started                 | —                     | —      |
+| M8 — GitHub Action                                   | not started                 | —                     | —      |
+| M9 — Docs and launch assets                          | not started                 | —                     | —      |
+| M10 — Release                                        | not started                 | —                     | —      |
 
 ## Standing instructions from the owner
 
@@ -363,7 +363,11 @@ The owner's own app (address and report kept outside this public repo, as agreed
 2. **The judge** (`src/ai/judge.ts`, prompt in `src/ai/prompts.ts`): in code — no evidence → no finding, near-duplicates merged, "What worked" without duplicates; with the model — one batched call that rewords AI-seen findings into plain English with a fix prompt. The model can only reword; it cannot change severity, evidence, or the list of findings. Any failure keeps the recorded wording.
 3. **Rate limits:** longer retries (over a minute in total), a slower pace after the first "too many requests", no waiting for daily limits.
 
-**How it was verified:** see the numbers in the overview table; deliberate breakages for the judge (5), the request matching (1) and — earlier, by running the tests before each fix — all three false alarms.
+**How it was verified:** typecheck and lint clean, 516 unit tests and 129 real-browser tests pass; deliberate breakages for the judge (5), the request matching (1) and — earlier, by running the tests before each fix — all three false alarms.
+
+**Real-key run on the fixture (2026-11-15, approved by the owner, one run):** `npm run test:ai` — 12 of 12 checks pass, 32 of 150 AI calls, about 2 minutes. All planted bugs it should find were found (#1–#8, #11), the delete and checkout traps were untouched, no false secret flag. **Gap:** the judge's own model call was not made in this run — every planted bug is a measured finding, so nothing needed rewording. It has only run against the scripted model.
+
+**Re-run on the owner's app (2026-11-15, approved, one run; URL, report and findings stay out of the repo):** 32 AI calls, about 2 minutes, no "too many requests". The two false sign-up Blockers and the false main-feature Blocker are gone, and no account was made with invented details. Two things were still wrong and were then reproduced on the fixture and fixed (commit after this run, **not yet confirmed on the real app**): (1) sign-up had worked, but ShipCheck judged before the app's slow answer arrived and said "could not confirm" → it now waits for an outcome; (2) an analytics event with a "name" of its own was still taken for the form's request → the form's request is now the one carrying a typed value, and a refusal message on the page counts as a refusal. The judge's model call was not made here either (no AI-seen finding).
 
 **Off-spec / decisions (SPEC §13, 2026-11-15 M6):** the judge does not set severity (the code does); every planted fixture bug is a measured finding, so in a fixture run the judge's model call happens only for AI-seen problems.
 

@@ -43,6 +43,8 @@ export type EvidenceEvent = {
       status: number;
       /** Field names in the request body — never the values. */
       bodyKeys: string[];
+      /** The body contains a value ShipCheck had just typed (see `watch`). */
+      echoes: boolean;
     }
   | { kind: 'dialog'; text: string; dialogType: string }
 );
@@ -85,10 +87,31 @@ export class Evidence {
   /** Requests ShipCheck stopped on purpose, so their failure is tagged as ours. */
   private readonly blocked = new WeakSet<Request>();
   private scope: string | undefined;
+  private watched: string[] = [];
 
   /** Registers a value (password, API key) that must never appear in logs or reports. */
   protect(secret: string | undefined): void {
     if (secret && secret.length >= 4) this.secrets.add(secret);
+  }
+
+  /**
+   * Values ShipCheck is about to submit in a form. A request whose body contains one of them is
+   * the form's own request — the surest way to tell it from tracking beacons. Only "yes/no" is
+   * kept; the body itself is never stored.
+   */
+  watch(values: readonly string[]): void {
+    this.watched = values.filter((value) => value.length >= 6).map((value) => value.slice(0, 40));
+  }
+
+  private echoes(body: string | null): boolean {
+    if (!body || this.watched.length === 0) return false;
+    let decoded = body;
+    try {
+      decoded = `${body} ${decodeURIComponent(body.replace(/\+/g, ' '))}`;
+    } catch {
+      // not URL-encoded
+    }
+    return this.watched.some((value) => decoded.includes(value));
   }
 
   /** Replaces every protected value in the text. */
@@ -191,6 +214,7 @@ export class Evidence {
             method: request.method(),
             status: response.status(),
             bodyKeys: bodyKeys(request.postData()),
+            echoes: this.echoes(request.postData()),
           });
         }
         if (response.status() < 400) return;

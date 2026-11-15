@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { PROMPTS } from '../ai/prompts.js';
-import { isFormRequest } from '../browser/body-keys.js';
+import { carriesTypedValue } from '../browser/body-keys.js';
 import { ADVICE } from '../report/present.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
 import { click, fill, first, readFields } from './fields.js';
@@ -14,6 +14,8 @@ const OutcomeSchema = z.object({
 
 /** How long to wait for the app to move on after the server accepted the sign-up. */
 const REDIRECT_WAIT_MS = 10_000;
+/** How long to wait for the app to send the sign-up request at all. */
+const ANSWER_WAIT_MS = 3_000;
 
 /** Flow 2 (SPEC §6.1): create an account with a generated test identity. */
 export const signupFlow: FlowBody = async (ctx) => {
@@ -70,12 +72,9 @@ export const signupFlow: FlowBody = async (ctx) => {
     else if (field.kind === 'checkbox') await ctx.perform(click(field), `Tick “${field.label}”`);
   }
   const email = ctx.config.email ?? identity.email;
-  const formKeys = fields
-    .filter((field) => field.kind !== 'submit')
-    .flatMap((field) => field.facts.name.split(/\s+/))
-    .filter(Boolean);
   const before = await ctx.snapshot();
   const eventsBefore = ctx.evidence.events.length;
+  ctx.evidence.watch([email]);
   const sent = await ctx.perform(click(submit), `Click “${submit.label}” to create the account`);
   if (sent.status === 'blocked') {
     ctx.skip(`Signing up — ShipCheck did not press “${submit.label}” (${sent.reason})`);
@@ -86,15 +85,24 @@ export const signupFlow: FlowBody = async (ctx) => {
   const answers = () =>
     ctx.evidence.events
       .slice(eventsBefore)
-      .flatMap((e) => (e.kind === 'write-response' && isFormRequest(e, formKeys) ? [e] : []));
+      .flatMap((e) => (e.kind === 'write-response' && carriesTypedValue(e) ? [e] : []));
   const refused = () => answers().some((e) => e.status >= 400);
   const acceptedByServer = () => !refused() && answers().some((e) => e.status < 400);
-  // The server said yes but the page has not moved on yet: many apps show "Signing you in…"
-  // first. Wait for the new page instead of judging the loading screen.
-  if (after.url === before.url && acceptedByServer()) {
-    await ctx.waitForAddressChange(before.url, REDIRECT_WAIT_MS);
+  // Many apps answer slowly and show "Signing you in…" before they move on. Judging that
+  // loading screen calls a working sign-up broken, so wait for an outcome: a new page, or the
+  // server refusing. If no sign-up request is answered at all within a few seconds, nothing was
+  // sent (the page refused the input itself, or the button does nothing) and waiting is over.
+  const started = Date.now();
+  while (ctx.page.url() === before.url && !refused()) {
+    const waited = Date.now() - started;
+    if (waited >= REDIRECT_WAIT_MS || (waited >= ANSWER_WAIT_MS && answers().length === 0)) break;
+    if (!(await ctx.pause(250))) break;
+  }
+  if (ctx.page.url() !== before.url || answers().length > 0) {
+    await ctx.settle(); // let the new page, or the error message, appear
     after = await ctx.snapshot();
   }
+  ctx.evidence.watch([]);
   const steps = [
     `Open ${formUrl}.`,
     `Fill in the sign-up form with a new email address (ShipCheck used ${email}) and a password of 20 characters.`,

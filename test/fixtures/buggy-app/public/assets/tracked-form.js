@@ -3,10 +3,11 @@
 // as hosting platforms and analytics tools do. A tester that takes any accepted POST for
 // "the server accepted the form" reports a false alarm here.
 function track(name) {
-  fetch("/api/track", {
+  // Like real analytics: the address is not obviously "tracking", and the body has a "name".
+  fetch("/__t/trackevents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ event: name }),
+    body: JSON.stringify({ events: [{ name: name, email: null, ts: Date.now() }] }),
     keepalive: true,
   }).catch(function () {});
 }

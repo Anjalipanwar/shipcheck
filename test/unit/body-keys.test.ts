@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyKeys, isFormRequest } from '../../src/browser/body-keys.js';
+import { bodyKeys, carriesTypedValue, isFormRequest } from '../../src/browser/body-keys.js';
 
 describe('bodyKeys: field names of a request body, never the values', () => {
   it('JSON, also nested', () => {
@@ -52,5 +52,35 @@ describe('isFormRequest: the form’s own request, or something else sent by the
     expect(isFormRequest(at('https://a.app/api/track', []), form)).toBe(false);
     expect(isFormRequest(at('https://a.app/_vercel/insights/event', []), [])).toBe(false);
     expect(isFormRequest(at('https://a.app/api/eventbooking', []), [])).toBe(true);
+  });
+});
+
+describe('carriesTypedValue: after ShipCheck typed something, the form’s request is the one that carries it', () => {
+  it('a request with the typed value is the form’s; an analytics event with a “name” is not', () => {
+    expect(
+      carriesTypedValue({ url: 'https://a.app/api/contact', bodyKeys: ['x'], echoes: true }),
+    ).toBe(true);
+    expect(
+      carriesTypedValue({
+        url: 'https://a.app/__l/trackevents',
+        bodyKeys: ['events', 'name', 'email', 'ts'],
+        echoes: false,
+      }),
+    ).toBe(false);
+    expect(
+      carriesTypedValue({ url: 'https://a.app/save', bodyKeys: ['name'], echoes: false }),
+    ).toBe(false);
+  });
+  it('a body that could not be read: only the address can decide', () => {
+    expect(carriesTypedValue({ url: 'https://a.app/api/contact', bodyKeys: [] })).toBe(true);
+    expect(carriesTypedValue({ url: 'https://a.app/__l/trackevents', bodyKeys: [] })).toBe(false);
+  });
+  it('“trackevents”, “tracking”, “tracker” are tracking addresses; “/login” is not', () => {
+    for (const path of ['/__l/trackevents', '/tracking', '/api/tracker', '/v1/events']) {
+      expect(isFormRequest({ url: `https://a.app${path}`, bodyKeys: [] }, []), path).toBe(false);
+    }
+    for (const path of ['/login', '/api/signup', '/auth/v1/signup', '/api/racetrack-booking']) {
+      expect(isFormRequest({ url: `https://a.app${path}`, bodyKeys: [] }, []), path).toBe(true);
+    }
   });
 });
