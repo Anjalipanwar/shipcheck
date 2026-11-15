@@ -265,11 +265,13 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 **How it was verified**
 
-- `npm run typecheck`, `npm run lint`, `npm test` (446 unit tests), `npm run test:e2e` (110 real-browser tests) all pass.
+- `npm run typecheck`, `npm run lint`, `npm test` (446 unit tests), `npm run test:e2e` (113 real-browser tests) all pass.
 - Unit: both outcomes in `judgeLayout` (Minor with the note; Major), both in one run, "banner" vs "cookie banner"; the safe-choice list with 12 allowed and 19 refused labels (including "Accept & close", "Close account", "OK", "Got it").
-- Real browser: "Reject all" is tapped and never "Accept all"; only "Accept all" → nothing tapped (even with the guard switched off); a "Close" that does not close → still covered; a "Close" inside a payment form → refused by the guard; a cover that is not a banner → nothing tried.
+- Real browser: "Reject all" is tapped and never "Accept all"; only "Accept all" → nothing tapped (even with the guard switched off); a "Close" that does not close → still covered; a "Close" inside a payment form → refused by the guard; a cover that is not a banner → nothing tried; a fixed app shell that holds the button is not a banner (its in-app "Decline" is never tapped); two banners → addresses are re-read after each close, so a "Close" in the page content is never tapped.
+- Full `--no-ai` run on a one-page local server with a cookie banner: one Minor "A cookie banner covers the “Sign up” button until it’s closed", screenshot taken with the banner showing, "Reject all" in the action log, "Accept all" never tapped.
 - Bug #12: full `--no-ai` runs started on each page — `/menu-broken.html` gives exactly one Major "The menu does not open on a phone" (phone, two screenshots), `/menu-ok.html` gives none and lists "The menu opens on a phone". The default run from `/` never reaches either page.
-- Deliberate breakages, each caught: guard skipped (1 test failed); consent veto removed and "accept all" added to the safe list (4 tests failed).
+- Deliberate breakages, each caught: guard skipped (1 test failed); consent veto removed and "accept all" added to the safe list (4 failed); banner search allowed to climb past the covered button (1 failed); stale banner addresses reused without re-checking (2 failed).
+- Found in review before the push and fixed: the first version could treat a fixed app shell as a "banner", and could reuse a stale address after the first banner was removed — in both cases a safe-looking button in the app itself (e.g. "Decline") could have been tapped. A "close" tap that leaves the page now goes back to it; a `#hash` change does not count as leaving.
 
 **Open questions**
 

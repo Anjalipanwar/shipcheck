@@ -175,6 +175,39 @@ describe('covered buttons: close the banner with a safe choice first (owner, 202
     expect(evidence.actionLog.map((a) => a.result)).toEqual(['blocked']);
   });
 
+  it('a fixed app shell holding the button is not a banner: its in-app “Decline” is never tapped', async () => {
+    const facts = await show(
+      `<div class="shell"><button style="display:block;margin:40px 16px;width:200px;height:48px">Sign up</button>
+       <div class="invite">Team invite <button onclick="document.title='WRONG'">Decline</button></div></div>`,
+      '.shell{position:fixed;inset:0;overflow:auto}.invite{position:absolute;top:20px;left:0;right:0;height:120px;background:#eee}',
+    );
+    expect(facts.covered.map((c) => [c.control.label, c.cover])).toEqual([['Sign up', null]]);
+    expect(await dismiss(facts, false)).toEqual(facts);
+    expect(await phone.page.title()).toBe('');
+    expect(evidence.actionLog).toEqual([]);
+  });
+
+  it('two banners: addresses are re-read after each close, so a “Close” in the page is never tapped', async () => {
+    // Removing the first banner shifts the second one's position-based address onto the content.
+    const facts = await show(
+      `<div class="bar top">News: we moved! <button onclick="this.parentElement.remove()">Close</button></div>
+       <div class="bar bottom">We use cookies. <button onclick="this.parentElement.remove()">Reject all</button></div>
+       <div class="content">
+         <button class="b" style="margin-top:20px">Sign up</button>
+         <button class="b" style="margin-top:250px" onclick="document.title='WRONG'">Close</button>
+         <button class="b" style="margin-top:400px">Buy</button>
+       </div>`,
+      '.bar{position:fixed;left:0;right:0;height:140px;background:#eee}.top{top:0}.bottom{bottom:0}.b{display:block;width:200px;height:48px}',
+    );
+    expect(facts.covered.map((c) => c.control.label)).toEqual(['Sign up', 'Buy']);
+    const judged = await dismiss(facts);
+    expect(await phone.page.title()).toBe('');
+    expect(judged.covered.map((c) => [c.control.label, c.closedWith])).toEqual([
+      ['Sign up', 'Close'],
+      ['Buy', 'Reject all'],
+    ]);
+  });
+
   it('a button covered by the normal layout (no fixed banner) → nothing to close', async () => {
     const facts = await show(
       `<main><button style="display:block;width:200px;height:48px">Sign up</button>

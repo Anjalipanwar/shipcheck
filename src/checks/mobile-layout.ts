@@ -132,9 +132,12 @@ const LAYOUT_SCRIPT = `(() => {
     if (!hit || el.contains(hit) || hit.contains(el)) continue;
     // A label wrapping or pointing at the control taps the control itself.
     if (hit.closest('label') && hit.closest('label').contains(el)) continue;
-    // The outermost fixed or sticky box the cover sits in: a banner or pop-up that might be closable.
+    // The outermost fixed or sticky box the cover sits in: a banner or pop-up that might be
+    // closable. It must not contain the covered control (an app whose whole shell is fixed is
+    // not a banner).
     let overlay = null;
     for (let node = hit; node && node !== document.body; node = node.parentElement) {
+      if (node.contains(el)) break;
       const position = getComputedStyle(node).position;
       if (position === 'fixed' || position === 'sticky') overlay = node;
     }

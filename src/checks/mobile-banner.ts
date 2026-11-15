@@ -64,12 +64,21 @@ export function safeDismissKind(names: readonly string[]): SafeDismiss | null {
 
 const RANK: Record<SafeDismiss, number> = { reject: 0, necessary: 1, close: 2 };
 
-/** Buttons inside the covering box. Links are left out: following one could leave the page. */
-const FIND_BUTTONS = `((cover) => {
+/**
+ * Buttons inside the covering box. Links are left out: following one could leave the page.
+ * Addresses are positional and can go stale (a banner removed, a widget added), so the box is
+ * re-checked first: it must still be fixed or sticky and still start with the recorded text.
+ * Otherwise nothing is returned and nothing is tapped.
+ */
+const FIND_BUTTONS = `((cover, expectedText) => {
   ${XPATH_OF_SOURCE}
   const found = document.evaluate(cover.replace(/^xpath=/, ''), document, null,
     XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
   if (!found || found.nodeType !== 1) return [];
+  const position = getComputedStyle(found).position;
+  if (position !== 'fixed' && position !== 'sticky') return [];
+  const text = (found.innerText || '').replace(/\\s+/g, ' ').trim();
+  if (!expectedText || !text.startsWith(expectedText.slice(0, 60))) return [];
   const clean = (value) => String(value ?? '').replace(/\\s+/g, ' ').trim().slice(0, 80);
   const shown = (el) => {
     const box = el.getBoundingClientRect();
@@ -95,79 +104,96 @@ export interface DismissOptions {
 }
 
 const key = (c: Covered): string => `${c.control.tag}|${c.control.label}`;
+const withoutHash = (url: string): string => url.split('#')[0] ?? url;
+
+type Attempt = { tapped: string } | { tapped: null; leftPage: boolean };
+
+/** One safe, guarded tap inside one banner. */
+async function closeOne(page: Page, cover: Covered, options: DismissOptions): Promise<Attempt> {
+  const none = { tapped: null, leftPage: false } as const;
+  if (!cover.cover) return none;
+  const buttons = ButtonsSchema.parse(
+    await page.evaluate(
+      `${FIND_BUTTONS}(${JSON.stringify(cover.cover)}, ${JSON.stringify(cover.coverText)})`,
+    ),
+  );
+  const choice = buttons
+    .map((b) => ({ ...b, kind: safeDismissKind(b.names) }))
+    .filter((b): b is typeof b & { kind: SafeDismiss } => b.kind !== null)
+    .sort((a, b) => RANK[a.kind] - RANK[b.kind])[0];
+  if (!choice) return none; // nothing safe to tap: the banner stays, the button stays covered
+
+  const label = choice.names[0] ?? choice.kind;
+  const startUrl = page.url();
+  const logged = {
+    device: options.device,
+    flow: 'mobile',
+    intent: `Close the banner covering a button (“${label}”)`,
+    action: 'click',
+    locator: choice.selector,
+    url: startUrl,
+  };
+  const verdict =
+    options.guardEnabled === false
+      ? { allowed: true as const }
+      : judgeAction(
+          { selector: choice.selector, description: `Banner button “${label}”`, method: 'click' },
+          await readElementFacts(page, choice.selector),
+        );
+  if (!verdict.allowed) {
+    options.evidence.logAction({ ...logged, result: 'blocked', detail: verdict.reason });
+    return none;
+  }
+  let ok = true;
+  try {
+    await page.locator(choice.selector).click({ timeout: 3000 });
+  } catch {
+    ok = false;
+  }
+  await page.waitForTimeout(SETTLE_MS);
+  options.evidence.logAction({ ...logged, result: ok ? 'ok' : 'failed' });
+  if (withoutHash(page.url()) !== withoutHash(startUrl)) {
+    // The "close" button left the page. Go back, so later checks run where they expect to.
+    await page.goto(startUrl).catch(() => undefined);
+    return { tapped: null, leftPage: true };
+  }
+  return ok ? { tapped: label } : none;
+}
 
 /**
- * Tries to close the banners covering buttons on the current page, then measures again. Returns
- * `facts` with `closedWith` set on each covered button whose own banner was closed and which could be
- * tapped afterwards. Only
- * `covered` changes; everything else stays as first measured (the screenshot shows that state).
+ * Tries to close the banners covering buttons on the current page (at most two), measuring the
+ * page again after every tap. Returns `facts` with `closedWith` set on each covered button
+ * whose own banner was closed and which could be tapped afterwards. Only `covered` changes;
+ * everything else stays as first measured (the screenshot, taken before, shows that state).
  */
 export async function dismissCoveringBanners(
   page: Page,
   facts: LayoutFacts,
   options: DismissOptions,
 ): Promise<LayoutFacts> {
-  const covers = [...new Set(facts.covered.flatMap((c) => (c.cover ? [c.cover] : [])))].slice(
-    0,
-    MAX_COVERS,
-  );
-  if (covers.length === 0) return facts;
-
-  const startUrl = page.url();
-  /** Cover address → label of the safe button tapped on it. */
+  /** Banner (identified by its text) → label of the safe button tapped on it. */
   const tapped = new Map<string, string>();
-  for (const cover of covers) {
-    const buttons = ButtonsSchema.parse(
-      await page.evaluate(`${FIND_BUTTONS}(${JSON.stringify(cover)})`),
-    );
-    const choice = buttons
-      .map((b) => ({ ...b, kind: safeDismissKind(b.names) }))
-      .filter((b): b is typeof b & { kind: SafeDismiss } => b.kind !== null)
-      .sort((a, b) => RANK[a.kind] - RANK[b.kind])[0];
-    if (!choice) continue; // nothing safe to tap: the banner stays, the button stays covered
-
-    const label = choice.names[0] ?? choice.kind;
-    const logged = {
-      device: options.device,
-      flow: 'mobile',
-      intent: `Close the banner covering a button (“${label}”)`,
-      action: 'click',
-      locator: choice.selector,
-      url: page.url(),
-    };
-    const verdict =
-      options.guardEnabled === false
-        ? { allowed: true as const }
-        : judgeAction(
-            { selector: choice.selector, description: `Banner button “${label}”`, method: 'click' },
-            await readElementFacts(page, choice.selector),
-          );
-    if (!verdict.allowed) {
-      options.evidence.logAction({ ...logged, result: 'blocked', detail: verdict.reason });
+  const tried = new Set<string>();
+  let current = facts;
+  for (let attempt = 0; attempt < MAX_COVERS; attempt += 1) {
+    const next = current.covered.find((c) => c.cover && !tried.has(c.coverText));
+    if (!next) break;
+    tried.add(next.coverText);
+    const result = await closeOne(page, next, options);
+    if (result.tapped === null) {
+      if (result.leftPage) return facts;
       continue;
     }
-    let ok = true;
-    try {
-      await page.locator(choice.selector).click({ timeout: 3000 });
-    } catch {
-      ok = false;
-    }
-    await page.waitForTimeout(SETTLE_MS);
-    options.evidence.logAction({ ...logged, result: ok ? 'ok' : 'failed' });
-    if (page.url() !== startUrl) {
-      // The "close" button left the page: nothing can be judged on it any more.
-      return facts;
-    }
-    if (ok) tapped.set(cover, label);
+    tapped.set(next.coverText, result.tapped);
+    current = await collectLayoutFacts(page);
   }
   if (tapped.size === 0) return facts;
 
-  const after = await collectLayoutFacts(page);
-  const stillCovered = new Set(after.covered.map(key));
+  const stillCovered = new Set(current.covered.map(key));
   return {
     ...facts,
     covered: facts.covered.map((c) => {
-      const closedWith = c.cover ? tapped.get(c.cover) : undefined;
+      const closedWith = c.cover ? tapped.get(c.coverText) : undefined;
       return closedWith !== undefined && !stillCovered.has(key(c)) ? { ...c, closedWith } : c;
     }),
   };

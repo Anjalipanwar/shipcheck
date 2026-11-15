@@ -1,4 +1,6 @@
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -308,6 +310,46 @@ describe('planted bug #12 — runs started on the menu pages (they are not linke
 
   it('the default run from “/” never reaches the menu pages', () => {
     expect(report.actionLog.some((a) => /menu-(ok|broken)/.test(a.url ?? ''))).toBe(false);
+  });
+});
+
+describe('covered button in a full run (owner decision 2026-11-15)', () => {
+  it('a closable cookie banner → Minor “covers … until it’s closed”, screenshot taken with the banner', async () => {
+    const html = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Banner</title>
+      <style>body{margin:0;font:16px sans-serif}.cta{display:block;margin:700px 16px 0;width:200px;height:48px}
+      .bar{position:fixed;bottom:0;left:0;right:0;height:220px;background:#eee}.bar button{min-height:44px;margin:4px}</style></head>
+      <body><main><h1>Banner</h1><button class="cta">Sign up</button></main>
+      <div class="bar"><p>We use cookies.</p><button id="accept">Accept all</button><button id="reject">Reject all</button></div>
+      <script>document.getElementById('accept').onclick = () => { document.title = 'ACCEPTED'; };
+        document.getElementById('reject').onclick = () => document.querySelector('.bar').remove();</script></body></html>`;
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(html);
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const result = await runShipCheck(
+        loadConfig(`http://127.0.0.1:${port}/`, { ai: false, yes: true }, {}),
+      );
+      const covered = result.report.findings.filter((f) =>
+        f.rule.startsWith('mobile/button-covered'),
+      );
+      expect(covered.map((f) => [f.rule, f.severity, f.title])).toEqual([
+        [
+          'mobile/button-covered-until-closed',
+          'minor',
+          'A cookie banner covers the “Sign up” button until it’s closed',
+        ],
+      ]);
+      expect(covered[0]?.evidence.screenshots).toHaveLength(1);
+      expect(
+        result.report.actionLog
+          .filter((a) => a.intent.startsWith('Close the banner'))
+          .map((a) => [a.intent, a.result]),
+      ).toEqual([['Close the banner covering a button (“Reject all”)', 'ok']]);
+    } finally {
+      server.close();
+    }
   });
 });
 
