@@ -8,6 +8,7 @@ import { loadConfig } from '../../src/config.js';
 import { renderStepSummary } from '../../src/report/markdown.js';
 import { writeReport } from '../../src/report/write.js';
 import { runShipCheck } from '../../src/runner.js';
+import { summaryLines } from '../../src/summary.js';
 import { DEMO_ACCOUNT, startFixtureServer } from '../helpers/fixture-server.js';
 import { createScriptedDriver } from '../helpers/scripted-driver.js';
 
@@ -106,6 +107,69 @@ describe('passwords never reach any output', () => {
       await app.close();
     }
   });
+
+  // M7 (BUILD_PLAN): "nothing secret written anywhere — grep the output dir for the test password".
+  it.each([
+    ['--email / --password', { email: DEMO_ACCOUNT.email, password: DEMO_ACCOUNT.password }, {}],
+    [
+      'SHIPCHECK_EMAIL / SHIPCHECK_PASSWORD',
+      {},
+      { SHIPCHECK_EMAIL: DEMO_ACCOUNT.email, SHIPCHECK_PASSWORD: DEMO_ACCOUNT.password },
+    ],
+  ])(
+    'the test account’s password given with %s is typed into the app but is in no file and not in the terminal',
+    async (_name, flags, env) => {
+      const app = await startFixtureServer();
+      const outDir = await mkdtemp(join(tmpdir(), 'shipcheck-pw-'));
+      try {
+        const progress: string[] = [];
+        let driver: ReturnType<typeof createScriptedDriver> | undefined;
+        const result = await runShipCheck(
+          loadConfig(app.url, { yes: true, flows: 'signup,login,core', ...flags }, env),
+          { progress: (line) => progress.push(line) },
+          {
+            aiDriver: (budget) => {
+              driver = createScriptedDriver({ budget });
+              return driver;
+            },
+          },
+        );
+        // The password really was used: typed into the log-in form, and the log-in worked.
+        expect((driver?.acted ?? []).map((action) => action.arguments?.[0])).toContain(
+          DEMO_ACCOUNT.password,
+        );
+        expect(app.hits.login).toBeGreaterThanOrEqual(1);
+
+        const written = await writeReport(outDir, result.report, result.screenshots, result.redact);
+        const files = (await readdir(outDir, { recursive: true })).filter(
+          (name) => !/\.jpg$/.test(name),
+        );
+        expect(files).toEqual(expect.arrayContaining(['report.html', 'report.md', 'report.json']));
+        const outputs: [string, string][] = [
+          ...(await Promise.all(
+            files
+              .filter((name) => /\.\w+$/.test(name))
+              .map(
+                async (name) =>
+                  [name, await readFile(join(outDir, name), 'utf8')] as [string, string],
+              ),
+          )),
+          [
+            'terminal summary',
+            summaryLines(result.report, written.htmlPath, result.llm).join('\n'),
+          ],
+          ['progress lines', progress.join('\n')],
+          ['step summary', renderStepSummary(result.report)],
+        ];
+        for (const [name, text] of outputs) {
+          expect(text.includes(DEMO_ACCOUNT.password), `${name} contains the password`).toBe(false);
+        }
+      } finally {
+        await rm(outDir, { recursive: true, force: true });
+        await app.close();
+      }
+    },
+  );
 
   it('a field where ShipCheck typed a password is shown as hidden, however short the password is', async () => {
     const app = await startFixtureServer();

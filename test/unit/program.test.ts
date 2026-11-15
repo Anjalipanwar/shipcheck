@@ -46,20 +46,42 @@ describe('CLI definition', () => {
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it('passes the URL and default flag values to the run handler', async () => {
+  it('passes the URL to the run handler and sets no defaults itself (the settings file must be able to fill the gaps)', async () => {
     const { program, run } = setup();
     await program.parseAsync(['https://example.test'], { from: 'user' });
-    expect(run).toHaveBeenCalledWith(
-      'https://example.test',
-      expect.objectContaining({
-        out: './shipcheck-report',
-        failOn: 'blocker',
-        maxMinutes: '10',
-        skipMobile: false,
-        headed: false,
-        yes: false,
-      }),
+    expect(run).toHaveBeenCalledWith('https://example.test', { ai: true });
+  });
+
+  it('passes typed flags on as commander names them', async () => {
+    const { program, run } = setup();
+    await program.parseAsync(
+      [
+        'https://example.test',
+        '--out',
+        'x',
+        '--fail-on',
+        'major',
+        '--max-minutes',
+        '3',
+        '--skip-mobile',
+        '--headed',
+        '--yes',
+        '--no-ai',
+        '--flows',
+        'core',
+      ],
+      { from: 'user' },
     );
+    expect(run).toHaveBeenCalledWith('https://example.test', {
+      out: 'x',
+      failOn: 'major',
+      maxMinutes: '3',
+      skipMobile: true,
+      headed: true,
+      yes: true,
+      ai: false,
+      flows: 'core',
+    });
   });
 
   it('rejects a missing URL without calling the run handler', async () => {

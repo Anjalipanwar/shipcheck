@@ -3,24 +3,24 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, M6 done (fourth and last re-run on the owner's app clean); M7 started
-- **Next up:** M7 — CLI polish (owner: "then go for M7", 2026-11-15). Open question for the owner: push of the local commits after `fc928dc` (phone menu, main-feature proof, this log).
+- **Last updated:** 2026-11-15, M7 built (settings file, report opens by itself, exit codes, tests that run the real command)
+- **Next up:** owner reviews M7 → "go" for M8. Open question for the owner: push of the local commits after `fc928dc` (`89cd502`, `6403dbc`, `a10f0fb` and the M7 commit).
 
 ## Overview
 
-| Milestone                                            | Status      | Commit                | Pushed                                |
-| ---------------------------------------------------- | ----------- | --------------------- | ------------------------------------- |
-| M0 — Scaffold                                        | done        | `b59adfc`             | yes                                   |
-| M1 — Fixture app with planted bugs                   | done        | `2d605ba`             | yes                                   |
-| M2 — Browser session, evidence, deterministic checks | done        | `6498102`             | yes                                   |
-| M3 — Report renderer and verdict                     | done        | `8e0b406`             | yes                                   |
-| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63`             | yes                                   |
-| M5 — Mobile pass                                     | done        | `f168b9e`             | yes                                   |
-| M6 — AI judge, fix prompts, dedupe                   | done        | `c2c651a` … `6403dbc` | up to `fc928dc` yes; later commits no |
-| M7 — CLI polish                                      | not started | —                     | —                                     |
-| M8 — GitHub Action                                   | not started | —                     | —                                     |
-| M9 — Docs and launch assets                          | not started | —                     | —                                     |
-| M10 — Release                                        | not started | —                     | —                                     |
+| Milestone                                            | Status                      | Commit                | Pushed                                |
+| ---------------------------------------------------- | --------------------------- | --------------------- | ------------------------------------- |
+| M0 — Scaffold                                        | done                        | `b59adfc`             | yes                                   |
+| M1 — Fixture app with planted bugs                   | done                        | `2d605ba`             | yes                                   |
+| M2 — Browser session, evidence, deterministic checks | done                        | `6498102`             | yes                                   |
+| M3 — Report renderer and verdict                     | done                        | `8e0b406`             | yes                                   |
+| M4 — AI flows with Stagehand + safety guard          | done                        | `f5f7e63`             | yes                                   |
+| M5 — Mobile pass                                     | done                        | `f168b9e`             | yes                                   |
+| M6 — AI judge, fix prompts, dedupe                   | done                        | `c2c651a` … `6403dbc` | up to `fc928dc` yes; later commits no |
+| M7 — CLI polish                                      | built, owner review pending | see M7 section        | no                                    |
+| M8 — GitHub Action                                   | not started                 | —                     | —                                     |
+| M9 — Docs and launch assets                          | not started                 | —                     | —                                     |
+| M10 — Release                                        | not started                 | —                     | —                                     |
 
 ## Standing instructions from the owner
 
@@ -381,11 +381,35 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 **Main feature used by clicking only (`6403dbc`):** it was quick, so it is fixed, not a known limit. A choice clicked inside a dialog that afterwards shows on the same page more often than at the start is measured proof; a dialog left open is closed with the Escape key before judging. Reproduced on `/planner.html` (test red), control `/planner.html?broken=1` stays "Not tested".
 
-**Fourth and last re-run on the owner's app (2026-11-15, approved, one run, ShipCheck signed up itself; URL, report and findings stay out of the repo):** 38 AI calls, about 2.5 minutes. **Clean.** Verdict "Ready to launch"; no Blocker, no Major; the same three measured Minors. Reported as working, on desktop and on the phone: sign-up, wrong-password message, log-in with the right password, staying logged in after a refresh, the main feature, data still there after a refresh. The log-in wait and the phone menu fix are both confirmed on the real app (the phone log shows the menu being opened, then the log-in page). **Not confirmed there:** the click-only proof — in this run the AI typed a meal name, so the older typed-text proof was used. It is covered by the fixture only. Across the four runs the main feature was reached in different ways, so its result can vary from run to run.
+**Fourth and last re-run on the owner's app (2026-11-15, approved, one run, ShipCheck signed up itself; URL, report and findings stay out of the repo):** 38 AI calls, about 2.5 minutes. **Clean.** Verdict "Ready to launch"; no Blocker, no Major; the same three measured Minors. Reported as working, on desktop and on the phone: sign-up, wrong-password message, log-in with the right password, staying logged in after a refresh, the main feature, data still there after a refresh. The log-in wait and the phone menu fix are both confirmed on the real app (the phone log shows the menu being opened, then the log-in page). **Not confirmed there:** the click-only proof — in this run the AI typed a meal name, so the older typed-text proof was used. It is covered by the fixture only, and it only applies when the choices are made on the page the main-feature flow started on. Across the four runs the main feature was reached in different ways, so its result can vary from run to run.
 
 **Verified after the follow-up:** typecheck and lint clean, 518 unit tests and 143 real-browser tests pass; deliberate breakages: server answer not outranking the model (1), judge denial check (1), log-in not waiting on the wrong password (1) or the right one (1), command-line account ignored (1), log-in model not overruled by the server on the wrong (1) or right password (1), leftover message counted as proof (1), leftover message ignored although the server refused (1), no wait for the old form to leave the screen (1), phone menu not opened (1), clicked choices not counted (1), open dialog not closed (1), "no change" counted as proof (1) — each fails a test. **Open, not fixed:** on the real app's phone pass the log-in form was not found, so log-in and the main feature show as "Not tested" on a phone. The setup time limit of the browser tests went from 60 to 120 seconds: a full fixture run now takes about 54 seconds (4 more than before, from the log-in waits).
 
 **Off-spec / decisions (SPEC §13, 2026-11-15 M6):** the judge does not set severity (the code does); every planted fixture bug is a measured finding, so in a fixture run the judge's model call happens only for AI-seen problems.
+
+## M7 — CLI polish
+
+- **Status:** built, owner review pending
+- **Commit:** see `git log` (the commit after `a10f0fb`)
+- **Pushed:** no — to be asked
+
+**What was already there (M0–M6):** all flags of SPEC §5.1, credentials from `SHIPCHECK_EMAIL` / `SHIPCHECK_PASSWORD`, the ownership question, CI detection, live progress lines, the printed summary, the no-key how-to, exit codes.
+
+**What M7 added**
+
+1. **`shipcheck.config.json`** in the current folder (`src/config.ts`): mirrors the flags, except `password` and `yes`, which stop the run with a plain message (SPEC §13). Unknown settings and broken JSON stop the run and are named. Order: flag → environment → file → default. For this the defaults moved out of the flag definitions into `loadConfig` — otherwise a default would have looked like something the user typed and beaten the file.
+2. **The report opens by itself** when a person is at a terminal, never in CI (`src/open-report.ts`, using the `open` package that was already a dependency).
+3. **Small testable pieces:** exit code (`src/exit-code.ts`), terminal summary (`src/summary.ts`), ownership question (`src/confirm.ts`). Found while checking by hand: closing the question with Ctrl+D printed "ShipCheck hit an unexpected problem" — now "Stopped. Nothing was tested."
+4. **Tests that run the real command** (`test/e2e/cli.test.ts`, 19 tests): against the fixture with `--no-ai`, each in an empty temporary folder with an environment that holds no AI key (so no test can use a real key). Exit code 1 with a Blocker, 0 with `--fail-on none`, 2 for no address / invalid address / unknown flag / wrong value / no key / no confirmation / password or typo in the settings file; verdict, top three and report path printed; `--out`; settings file used and beaten by flags; and once on the built package (`npm run build`, then `node dist/cli.js`).
+5. **Password search (BUILD_PLAN M7):** a test account's password given by flag and by environment variable is really typed into the fixture's log-in form, and is then searched for in every written file, the terminal summary, the progress lines and the step summary (`test/e2e/no-password-in-output.test.ts`).
+
+**How it was verified:** typecheck and lint clean, 562 unit tests and 164 real-browser tests pass. Deliberate breakages, each failing a test: exit code always 0; settings file beating a flag; password allowed in the settings file; ownership question skipped; the user's password not scrubbed. By hand in a pretend terminal: the ownership question appears, "n" and Ctrl+D both stop with "Stopped. Nothing was tested." and exit code 2, nothing is written.
+
+**Not verified by a test:** that a browser window really opens on the owner's machine after a run (the decision and the call are tested with a stand-in opener). Answering "y" in a real terminal.
+
+**Decided on the way (SPEC §13, 2026-11-15 M7):** `password` and `yes` are refused in the settings file; an app that does not open is exit code 1 (a Blocker), not 2.
+
+**Noticed, not changed:** when the app does not open at all, the progress line still says "Hidden errors… ✓" (the report itself shows it as not tested). The browser test suite now takes about 5–6 minutes locally; the CI job's limit is 15 minutes.
 
 ---
 
