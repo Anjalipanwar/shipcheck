@@ -502,9 +502,15 @@ export async function runShipCheck(
 
     // Last, because it looks at everything that happened during the run. Errors caused by
     // ShipCheck's own blocking are taken out first: they are never the app's fault.
-    await step('Hidden errors', 'errors', () =>
-      checkErrors(separateShipCheckBlocking(evidence.events).app),
-    );
+    // An app that did not open was not watched for errors: saying "✓" here would contradict
+    // the report, which shows this part as not tested.
+    if (landingLoaded) {
+      await step('Hidden errors', 'errors', () =>
+        checkErrors(separateShipCheckBlocking(evidence.events).app),
+      );
+    } else {
+      progress('Hidden errors… not checked (your app did not open)');
+    }
 
     // The judge (SPEC §8 step 7): no evidence → no finding, near-duplicates merged, and — in a
     // full check — one model call that rewords what the AI saw into plain English.

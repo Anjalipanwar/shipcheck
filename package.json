@@ -17,6 +17,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/cli.ts",
+    "fixture": "tsx test/helpers/serve-fixture.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",

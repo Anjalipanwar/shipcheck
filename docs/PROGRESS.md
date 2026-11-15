@@ -3,24 +3,24 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, M7 built (settings file, report opens by itself, exit codes, tests that run the real command)
-- **Next up:** owner reviews M7 → "go" for M8. Open question for the owner: push of the local commits after `fc928dc` (`89cd502`, `6403dbc`, `a10f0fb` and the M7 commit).
+- **Last updated:** 2026-11-15, M7 done (owner approved its two decisions); M8 started
+- **Next up:** M8 — GitHub Action (owner: "then go for M8", 2026-11-15). Waiting for the owner's result of the hand test of `--headed` and the report opening by itself (commands in the M7 section).
 
 ## Overview
 
-| Milestone                                            | Status                      | Commit                | Pushed                                |
-| ---------------------------------------------------- | --------------------------- | --------------------- | ------------------------------------- |
-| M0 — Scaffold                                        | done                        | `b59adfc`             | yes                                   |
-| M1 — Fixture app with planted bugs                   | done                        | `2d605ba`             | yes                                   |
-| M2 — Browser session, evidence, deterministic checks | done                        | `6498102`             | yes                                   |
-| M3 — Report renderer and verdict                     | done                        | `8e0b406`             | yes                                   |
-| M4 — AI flows with Stagehand + safety guard          | done                        | `f5f7e63`             | yes                                   |
-| M5 — Mobile pass                                     | done                        | `f168b9e`             | yes                                   |
-| M6 — AI judge, fix prompts, dedupe                   | done                        | `c2c651a` … `6403dbc` | up to `fc928dc` yes; later commits no |
-| M7 — CLI polish                                      | built, owner review pending | `951404c` + follow-up | no                                    |
-| M8 — GitHub Action                                   | not started                 | —                     | —                                     |
-| M9 — Docs and launch assets                          | not started                 | —                     | —                                     |
-| M10 — Release                                        | not started                 | —                     | —                                     |
+| Milestone                                            | Status      | Commit                           | Pushed                                                      |
+| ---------------------------------------------------- | ----------- | -------------------------------- | ----------------------------------------------------------- |
+| M0 — Scaffold                                        | done        | `b59adfc`                        | yes                                                         |
+| M1 — Fixture app with planted bugs                   | done        | `2d605ba`                        | yes                                                         |
+| M2 — Browser session, evidence, deterministic checks | done        | `6498102`                        | yes                                                         |
+| M3 — Report renderer and verdict                     | done        | `8e0b406`                        | yes                                                         |
+| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63`                        | yes                                                         |
+| M5 — Mobile pass                                     | done        | `f168b9e`                        | yes                                                         |
+| M6 — AI judge, fix prompts, dedupe                   | done        | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
+| M7 — CLI polish                                      | done        | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
+| M8 — GitHub Action                                   | not started | —                                | —                                                           |
+| M9 — Docs and launch assets                          | not started | —                                | —                                                           |
+| M10 — Release                                        | not started | —                                | —                                                           |
 
 ## Standing instructions from the owner
 
@@ -409,7 +409,9 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 **Decided on the way (SPEC §13, 2026-11-15 M7):** `password` and `yes` are refused in the settings file; an app that does not open is exit code 1 (a Blocker), not 2.
 
-**Noticed, not changed:** when the app does not open at all, the progress line still says "Hidden errors… ✓" (the report itself shows it as not tested). The browser test suite now takes about 5–6 minutes locally. The last CI run (`fc928dc`, before M7's 19 command tests) took 5 min 37 s in total; the CI job's limit is 15 minutes.
+**Owner's answers (2026-11-15):** push the five commits and report CI time (done: green, 5 min 02 s and 5 min 10 s per job, browser tests about 4.5 minutes — under the 10 minutes above which the tests were to be split, so no split). Refusing `password` and `yes` in the settings file: approved. A dead app = exit code 1: approved. Terminal and report must always agree — fixed and tested (SPEC §13): "Hidden errors… not checked (your app did not open)" instead of "✓"; `test/e2e/progress-agrees.test.ts` compares progress lines and the coverage table in seven situations (found only this one disagreement). Then M8.
+
+**For the owner's hand test of `--headed` and the report opening by itself** (not covered by any automated test): `npm run fixture` starts the pretend app at http://127.0.0.1:4173 (new helper `test/helpers/serve-fixture.ts`); in a second terminal `npm run build && node dist/cli.js http://127.0.0.1:4173 --no-ai --headed`. Result: waiting for the owner.
 
 ---
 

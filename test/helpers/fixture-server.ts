@@ -135,6 +135,8 @@ export interface FixtureOptions {
   rejectAllLogins?: boolean;
   /** Sign-up is broken on the server: every attempt is answered with an error. */
   rejectAllSignups?: boolean;
+  /** A fixed port (for trying things by hand, see `npm run fixture`). Default: any free port. */
+  port?: number;
 }
 
 /**
@@ -262,7 +264,7 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+    server.listen(options.port ?? 0, '127.0.0.1', resolve);
   });
   const { port } = server.address() as AddressInfo;
 
