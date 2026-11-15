@@ -20,8 +20,8 @@ const OPEN_DIALOG = '[role="dialog"]:visible, [role="alertdialog"]:visible, dial
 const occurrences = (text: string, phrase: string): number => text.split(phrase).length - 1;
 
 /**
- * The text of something chosen by a click, and the shorter phrases it starts with ("Rainbow
- * chickpea bowls 15 min" → "Rainbow chickpea bowls 15", "Rainbow chickpea bowls"): the list the
+ * The text of something chosen by a click, and the shorter phrases it starts with ("Lemon herb
+ * couscous 15 min" → "Lemon herb couscous 15", "Lemon herb couscous"): the list the
  * choice lands in often shows only the name. At least two words and eight characters, so that a
  * common word cannot count as proof.
  */

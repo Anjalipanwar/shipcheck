@@ -3,6 +3,7 @@ import { BACKSTOP_REASON_TEXT, installBackstop } from './backstop.js';
 import { withShipCheckSuffix, type DevicePreset } from './devices.js';
 import { createDomainLock, decideRoute, type DomainLock } from './domain.js';
 import { Evidence } from './evidence.js';
+import { isMissingBrowser, missingBrowserError } from './missing-browser.js';
 
 export interface SessionOptions {
   targetUrl: string;
@@ -76,12 +77,17 @@ export class BrowserSession {
 
   static async launch(options: SessionOptions): Promise<BrowserSession> {
     const lock = createDomainLock(options.targetUrl);
-    const browser = await chromium.launch({
-      headless: !options.headed,
-      args: options.cdpPort
-        ? [`--remote-debugging-port=${options.cdpPort}`, '--remote-debugging-address=127.0.0.1']
-        : [],
-    });
+    const browser = await chromium
+      .launch({
+        headless: !options.headed,
+        args: options.cdpPort
+          ? [`--remote-debugging-port=${options.cdpPort}`, '--remote-debugging-address=127.0.0.1']
+          : [],
+      })
+      .catch((error: unknown) => {
+        // First run on a new computer: say how to install the browser, in plain words.
+        throw isMissingBrowser(error) ? missingBrowserError() : error;
+      });
     try {
       const cdp = await browser.newBrowserCDPSession();
       const { userAgent } = await cdp.send('Browser.getVersion');

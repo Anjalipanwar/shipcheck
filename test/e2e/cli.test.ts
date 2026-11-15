@@ -177,6 +177,20 @@ describe('the shipcheck command', () => {
     });
   });
 
+  it('test browser not installed yet (first run): a plain how-to with the install command, exit code 2', async () => {
+    const empty = join(dir, 'no-browsers-here');
+    const { code, output } = await cli([app.url, ...quick, '--yes'], {
+      PLAYWRIGHT_BROWSERS_PATH: empty,
+    });
+    expect(code).toBe(2);
+    expect(output).toContain('ShipCheck needs its test browser (Chromium)');
+    // The exact version ShipCheck was built with, so the downloaded browser fits.
+    expect(output).toMatch(/npx playwright@\d+\.\d+\.\d+ install chromium/);
+    expect(output).not.toContain('unexpected problem');
+    expect(output).not.toMatch(NO_STACK_TRACE);
+    expect(existsSync(join(dir, 'shipcheck-report'))).toBe(false);
+  });
+
   it('in CI (CI=true) the ownership question is skipped', async () => {
     const { code, output } = await cli([app.url, ...quick, '--flows', 'landing'], { CI: 'true' });
     expect(code).toBe(1);

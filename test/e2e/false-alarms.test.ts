@@ -153,7 +153,7 @@ describe('false alarms from the real-app run', () => {
   const planSteps = (_page: Page, done: number): ProposedAction[] =>
     [
       'xpath=//button[@data-add="monday"]',
-      'xpath=//button[@data-recipe="Rainbow chickpea bowls"]',
+      'xpath=//button[@data-recipe="Lemon herb couscous"]',
       'xpath=//button[@data-add="tuesday"]',
     ]
       .slice(done, done + 1)
