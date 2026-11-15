@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, M5 follow-ups
-- **Next up:** real-app run (`--no-ai` and AI) and a short summary for the owner; then M6 — AI judge, fix prompts, dedupe, **only after the owner's "go"**
+- **Last updated:** 2026-11-15, M5 follow-ups pushed
+- **Next up:** real-app run (`--no-ai` and AI) and a short summary for the owner, once the owner sends the app's address. **Do not start M6** until the owner says "go" (owner, 2026-11-15).
 
 ## Overview
 
@@ -246,8 +246,8 @@ Updated at the end of every milestone. Read this at the start of every session.
 ## M5 follow-ups (owner decisions of 2026-11-15)
 
 - **Status:** done
-- **Commit:** `7dc0626`, fix `67b4a5a`
-- **Pushed:** no — waiting for the owner's answer
+- **Commit:** `7dc0626`, fix `67b4a5a` (progress-log commits `a0112d3`, `4459242`)
+- **Pushed:** yes (2026-11-15, owner asked; CI for `4459242` completed with success)
 
 **Owner decisions (2026-11-15)**
 
@@ -256,6 +256,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 3. Covered buttons: first try to close the covering banner with a safe choice only ("Close", "Reject", "Only necessary"; never "Accept all"), through the guard. Reachable afterwards → Minor with a note; cannot be closed or still covered → Major. Unit-test both.
 4. Menu check: existing fixture pages stay unchanged; two new pages, one working menu (must not be reported) and one broken (planted bug #12). BUGS.md updated.
 5. Before M6: run ShipCheck (`--no-ai` and AI) on the owner's real app and send a short summary (findings, likely false alarms, clear misses, AI calls). Wait for "go" on M6 after that.
+6. 2026-11-15: push the follow-up commits — done. "Don't start M6 yet."
 
 **What was built**
 
@@ -276,7 +277,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 **Open questions**
 
 - Bug #12 only shows in a run started on its own page. Should the menu check also run on the other pages of the phone pass (up to 5), not just the start page?
-- Real-app run: needs the app's address and the owner's confirmation that they own it or may test it.
+- Real-app run: needs the app's address and the owner's confirmation that they own it or may test it. The AI run would create a `shipcheck+…@example.com` account on the live app unless the owner puts a test account in `.env` (`SHIPCHECK_EMAIL` / `SHIPCHECK_PASSWORD`). The repo is public: the real-app report and address stay outside it; only the fact of the run and the AI call count go into this file.
 
 ---
 
