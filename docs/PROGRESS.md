@@ -3,24 +3,24 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, third re-run on the owner's app done; one more log-in fix after it
-- **Next up:** **M7 not started** — waiting for the owner. The third re-run on the owner's app had no false alarms, but the successful log-in was shown as "Not tested" (too cautious); the fix for that is on the fixture only, not confirmed on the real app. Open questions for the owner: a fourth re-run; push of the local follow-up commits; whether M7 may start.
+- **Last updated:** 2026-11-15, M6 done (fourth and last re-run on the owner's app clean); M7 started
+- **Next up:** M7 — CLI polish (owner: "then go for M7", 2026-11-15). Open question for the owner: push of the local commits after `fc928dc` (phone menu, main-feature proof, this log).
 
 ## Overview
 
-| Milestone                                            | Status                      | Commit                           | Pushed                                 |
-| ---------------------------------------------------- | --------------------------- | -------------------------------- | -------------------------------------- |
-| M0 — Scaffold                                        | done                        | `b59adfc`                        | yes                                    |
-| M1 — Fixture app with planted bugs                   | done                        | `2d605ba`                        | yes                                    |
-| M2 — Browser session, evidence, deterministic checks | done                        | `6498102`                        | yes                                    |
-| M3 — Report renderer and verdict                     | done                        | `8e0b406`                        | yes                                    |
-| M4 — AI flows with Stagehand + safety guard          | done                        | `f5f7e63`                        | yes                                    |
-| M5 — Mobile pass                                     | done                        | `f168b9e`                        | yes                                    |
-| M6 — AI judge, fix prompts, dedupe                   | built, owner review pending | `c2c651a`, `78589d1` + follow-up | `78589d1` yes (CI green); follow-up no |
-| M7 — CLI polish                                      | not started                 | —                                | —                                      |
-| M8 — GitHub Action                                   | not started                 | —                                | —                                      |
-| M9 — Docs and launch assets                          | not started                 | —                                | —                                      |
-| M10 — Release                                        | not started                 | —                                | —                                      |
+| Milestone                                            | Status      | Commit                | Pushed                                |
+| ---------------------------------------------------- | ----------- | --------------------- | ------------------------------------- |
+| M0 — Scaffold                                        | done        | `b59adfc`             | yes                                   |
+| M1 — Fixture app with planted bugs                   | done        | `2d605ba`             | yes                                   |
+| M2 — Browser session, evidence, deterministic checks | done        | `6498102`             | yes                                   |
+| M3 — Report renderer and verdict                     | done        | `8e0b406`             | yes                                   |
+| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63`             | yes                                   |
+| M5 — Mobile pass                                     | done        | `f168b9e`             | yes                                   |
+| M6 — AI judge, fix prompts, dedupe                   | done        | `c2c651a` … `6403dbc` | up to `fc928dc` yes; later commits no |
+| M7 — CLI polish                                      | not started | —                     | —                                     |
+| M8 — GitHub Action                                   | not started | —                     | —                                     |
+| M9 — Docs and launch assets                          | not started | —                     | —                                     |
+| M10 — Release                                        | not started | —                     | —                                     |
 
 ## Standing instructions from the owner
 
@@ -353,7 +353,7 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 ## M6 — AI judge, fix prompts, dedupe
 
-- **Status:** built and verified with the scripted model; real-key run on the fixture and re-run on the owner's app: see below
+- **Status:** done — the owner's condition (both runs clean) is met after the fourth re-run; owner: "then go for M7"
 - **Commit:** see the overview table
 - **Pushed:** `78eb04b`, `64c27f1`, `c2c651a` and `78589d1` pushed on the owner's request (2026-11-15); CI green for `78589d1`. The follow-up commit (prompt injection, log-in wait) is local — push not yet asked
 
@@ -375,7 +375,15 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 **Third re-run on the owner's app (2026-11-15, approved, one run, ShipCheck signed up itself; URL, report and findings stay out of the repo):** 40 AI calls, under 3 minutes. **No false alarms:** no Blocker, no Major; the only findings are three measured Minors. The wrong-password message is now seen. Sign-up works on desktop and phone. **Still not right, in the cautious direction:** (1) the log-in with the right password was shown as "Not tested — accepted, but could not confirm", although the run's own screenshot shows the user inside the app. Most likely cause, supported by the second re-run's evidence (new address, old form still visible): the app changes the address first and shows the new screen a moment later. Reproduced on the fixture (`/slow-login.html?lazy=1`, test red), then fixed: after an address change, ShipCheck waits up to 5 seconds for the old form to leave the screen (`src/flows/answer.ts`). **Not confirmed on the real app.** (2) The main feature was shown as "Not tested — could not confirm": ShipCheck added items by clicking only (nothing typed, so no measured proof), stopped with a dialog still open, and the model would not say it worked. Honest, but a miss; the second re-run had reported it as working, so this varies from run to run. Not fixed. (3) On the phone the log-in form was again not found. Not fixed.
 
-**Verified after the follow-up:** typecheck and lint clean, 518 unit tests and 140 real-browser tests pass; deliberate breakages: server answer not outranking the model (1), judge denial check (1), log-in not waiting on the wrong password (1) or the right one (1), command-line account ignored (1), log-in model not overruled by the server on the wrong (1) or right password (1), leftover message counted as proof (1), leftover message ignored although the server refused (1), no wait for the old form to leave the screen (1) — each fails a test. **Open, not fixed:** on the real app's phone pass the log-in form was not found, so log-in and the main feature show as "Not tested" on a phone. The setup time limit of the browser tests went from 60 to 120 seconds: a full fixture run now takes about 54 seconds (4 more than before, from the log-in waits).
+**Owner decisions after the third re-run (2026-11-15):** push `454eb65` and `fc928dc` (done). Phone log-in: fix before M7 — check the screenshots, open the phone menu through the guard, failing fixture test first. Main feature: one cheap fix (count matching items before and after, close an open dialog), otherwise record as a known limit. Then one fourth run on the owner's app — the last one there; further real-app testing will use a second app later. Then M7.
+
+**Phone menu (`89cd502`):** the screenshots of the third re-run confirmed it — on the phone the home page shows only a menu button, and the log-in link is behind it. Reproduced on `/menu-ok.html` (test red: "no sign-up form", "no log-in form" on a phone), then fixed: when no sign-up or log-in link is visible on a phone and no form is on screen, ShipCheck taps the menu button through the guard and looks once more (`src/flows/entry.ts`).
+
+**Main feature used by clicking only (`6403dbc`):** it was quick, so it is fixed, not a known limit. A choice clicked inside a dialog that afterwards shows on the same page more often than at the start is measured proof; a dialog left open is closed with the Escape key before judging. Reproduced on `/planner.html` (test red), control `/planner.html?broken=1` stays "Not tested".
+
+**Fourth and last re-run on the owner's app (2026-11-15, approved, one run, ShipCheck signed up itself; URL, report and findings stay out of the repo):** 38 AI calls, about 2.5 minutes. **Clean.** Verdict "Ready to launch"; no Blocker, no Major; the same three measured Minors. Reported as working, on desktop and on the phone: sign-up, wrong-password message, log-in with the right password, staying logged in after a refresh, the main feature, data still there after a refresh. The log-in wait and the phone menu fix are both confirmed on the real app (the phone log shows the menu being opened, then the log-in page). **Not confirmed there:** the click-only proof — in this run the AI typed a meal name, so the older typed-text proof was used. It is covered by the fixture only. Across the four runs the main feature was reached in different ways, so its result can vary from run to run.
+
+**Verified after the follow-up:** typecheck and lint clean, 518 unit tests and 143 real-browser tests pass; deliberate breakages: server answer not outranking the model (1), judge denial check (1), log-in not waiting on the wrong password (1) or the right one (1), command-line account ignored (1), log-in model not overruled by the server on the wrong (1) or right password (1), leftover message counted as proof (1), leftover message ignored although the server refused (1), no wait for the old form to leave the screen (1), phone menu not opened (1), clicked choices not counted (1), open dialog not closed (1), "no change" counted as proof (1) — each fails a test. **Open, not fixed:** on the real app's phone pass the log-in form was not found, so log-in and the main feature show as "Not tested" on a phone. The setup time limit of the browser tests went from 60 to 120 seconds: a full fixture run now takes about 54 seconds (4 more than before, from the log-in waits).
 
 **Off-spec / decisions (SPEC §13, 2026-11-15 M6):** the judge does not set severity (the code does); every planted fixture bug is a measured finding, so in a fixture run the judge's model call happens only for AI-seen problems.
 
