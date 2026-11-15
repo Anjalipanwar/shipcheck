@@ -4,6 +4,7 @@ import { PROMPTS } from '../ai/prompts.js';
 import { ADVICE } from '../report/present.js';
 import { watchSubmission } from './answer.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
+import { findEntry } from './entry.js';
 import { click, fill, first, readFields, type Field } from './fields.js';
 
 const OutcomeSchema = z.object({
@@ -30,7 +31,7 @@ async function findForm(ctx: FlowContext): Promise<LoginForm | undefined> {
 /** Flow 3 (SPEC §6.1): a wrong password once, then the right one, then a page refresh. */
 export const loginFlow: FlowBody = async (ctx) => {
   await ctx.goto(ctx.homeUrl, 'Open the home page');
-  const entry = (await ctx.observe(PROMPTS.loginEntry))[0];
+  const entry = await findEntry(ctx, PROMPTS.loginEntry);
   if (entry) {
     const opened = await ctx.perform(entry, 'Open the log-in page');
     if (opened.status === 'blocked') {

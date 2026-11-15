@@ -3,6 +3,7 @@ import { PROMPTS } from '../ai/prompts.js';
 import { ADVICE } from '../report/present.js';
 import { watchSubmission } from './answer.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
+import { findEntry } from './entry.js';
 import { click, fill, first, readFields } from './fields.js';
 
 const OutcomeSchema = z.object({
@@ -23,7 +24,7 @@ export const signupFlow: FlowBody = async (ctx) => {
     return;
   }
   await ctx.goto(ctx.homeUrl, 'Open the home page');
-  const entry = (await ctx.observe(PROMPTS.signupEntry))[0];
+  const entry = await findEntry(ctx, PROMPTS.signupEntry);
   if (entry) {
     const opened = await ctx.perform(entry, 'Open the sign-up page');
     if (opened.status === 'blocked') {

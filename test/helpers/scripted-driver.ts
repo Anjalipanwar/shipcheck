@@ -47,6 +47,15 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
   const observed: string[] = [];
   const acted: ProposedAction[] = [];
   const path = (page: Page) => new URL(page.url()).pathname;
+  // Like a model, it only finds a link a visitor can see (not one inside a closed phone menu).
+  const ifVisible = async (page: Page, action: ProposedAction): Promise<ProposedAction[]> =>
+    (await page
+      .locator(action.selector)
+      .first()
+      .isVisible()
+      .catch(() => false))
+      ? [action]
+      : [];
 
   return {
     observed,
@@ -80,7 +89,7 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
         case PROMPTS.signupEntry:
           return ['/signup.html', '/late-signup.html', '/injected-signup.html'].includes(path(page))
             ? []
-            : [click(navLink('/signup.html'), 'Sign up link')];
+            : await ifVisible(page, click(navLink('/signup.html'), 'Sign up link'));
         case PROMPTS.signupForm:
           return [
             fill(byId('signup-email'), 'Email field'),
@@ -90,7 +99,7 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
         case PROMPTS.loginEntry:
           return ['/login.html', '/slow-login.html'].includes(path(page))
             ? []
-            : [click(navLink('/login.html'), 'Log in link')];
+            : await ifVisible(page, click(navLink('/login.html'), 'Log in link'));
         case PROMPTS.loginForm:
           return [
             fill(byId('login-email'), 'Email field'),

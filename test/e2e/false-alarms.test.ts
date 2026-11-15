@@ -28,7 +28,7 @@ const run = async (
   flows: string,
   server: FixtureOptions = {},
   driver: ScriptedOptions = {},
-  flags: Record<string, string> = {},
+  flags: Record<string, string | boolean> = {},
 ) => {
   const app = await startFixtureServer(server);
   try {
@@ -123,6 +123,29 @@ describe('false alarms from the real-app run', () => {
     expect(problems(report, 'login/').map((f) => `${f.severity}: ${f.title}`)).toEqual([
       'blocker: Users cannot log in',
     ]);
+  });
+
+  it('on a phone, log-in and sign-up links behind the menu button are found by opening the menu', async () => {
+    const { report } = await run('/menu-ok.html', 'signup,login', {}, {}, { skipMobile: false });
+    expect(
+      report.notTested.filter((line) => / on a phone — no (log-in|sign-up) form/.test(line)),
+    ).toEqual([]);
+    // Both forms were reached on the phone: the sign-up form was filled in (its planted phone
+    // bug is found), and the log-in went through to the dashboard.
+    const phone = report.actionLog.filter((a) => a.device === 'mobile');
+    const paths = (flow: string) =>
+      phone.filter((a) => a.flow === flow).map((a) => new URL(a.url).pathname);
+    expect(paths('signup')).toContain('/signup.html');
+    expect(paths('login')).toEqual(expect.arrayContaining(['/login.html', '/dashboard.html']));
+    expect(report.findings.map((f) => f.rule)).toContain('signup/button-does-nothing');
+    expect(report.passed).toContain('Users stay logged in after refreshing the page on a phone');
+    const menuTaps = report.actionLog.filter(
+      (a) =>
+        a.device === 'mobile' &&
+        ['signup', 'login'].includes(a.flow ?? '') &&
+        /phone menu/.test(a.intent ?? ''),
+    );
+    expect(menuTaps.map((a) => a.result)).toEqual(['ok', 'ok']);
   });
 
   it('a tracking beacon is not “the server accepted the form”: a form that refuses bad input has no finding', async () => {

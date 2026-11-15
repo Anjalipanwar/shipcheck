@@ -79,9 +79,14 @@ export interface MenuCheckOptions {
   pagePath?: string;
 }
 
+/** The menu button in the page header, if a visitor can see one. */
+export async function findMenuToggle(page: Page): Promise<z.infer<typeof ToggleSchema>> {
+  return ToggleSchema.parse(await page.evaluate(FIND_TOGGLE));
+}
+
 export async function checkPhoneMenu(page: Page, options: MenuCheckOptions): Promise<CheckResult> {
   const none: CheckResult = { findings: [], passed: [], notTested: [] };
-  const toggle = ToggleSchema.parse(await page.evaluate(FIND_TOGGLE));
+  const toggle = await findMenuToggle(page);
   if (!toggle) return none; // No menu button: the menu links are shown directly (or there are none).
   if (options.seen?.has(toggle.signature)) return none; // same header as an earlier page
   options.seen?.add(toggle.signature);
