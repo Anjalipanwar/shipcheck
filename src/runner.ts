@@ -18,6 +18,7 @@ import { safeFetch } from './checks/fetch.js';
 import { checkHeaders } from './checks/headers.js';
 import { checkHttps } from './checks/https.js';
 import { checkLinks, linkPlacement, selectLinkTargets, type LinkProbe } from './checks/links.js';
+import { dismissCoveringBanners } from './checks/mobile-banner.js';
 import { checkPhoneMenu } from './checks/mobile-menu.js';
 import { collectLayoutFacts, judgeLayout, type CheckedPage } from './checks/mobile-layout.js';
 import { checkPerformance } from './checks/performance.js';
@@ -560,7 +561,8 @@ const facts = (landing: Landing): PageFacts => landing.facts;
 
 /**
  * Phone layout checks: the home page and up to five pages linked from it (menu and main buttons
- * first), each opened at iPhone size. The menu button is tapped once, on the home page only.
+ * first), each opened at iPhone size. A banner covering a button is closed once with a safe
+ * choice, if it has one. The menu button is tapped once, on the home page only.
  */
 async function phoneLayout(
   phone: DevicePage,
@@ -614,10 +616,19 @@ async function phoneLayout(
       const problem =
         pageFacts.pageWidth > pageFacts.screenWidth + 1 ||
         pageFacts.cutOff.length + pageFacts.covered.length + pageFacts.tooSmall.length > 0;
+      // Screenshot first, so a banner that is closed next still shows on it.
       const shot = problem
         ? await evidence.screenshot(phone.page, 'mobile', `layout ${new URL(url).pathname}`)
         : undefined;
-      checked.push({ facts: pageFacts, ...(shot ? { screenshot: shot.file } : {}) });
+      const judged =
+        pageFacts.covered.length > 0
+          ? await dismissCoveringBanners(phone.page, pageFacts, {
+              device: 'mobile',
+              evidence,
+              ...(options.guardEnabled === false ? { guardEnabled: false } : {}),
+            })
+          : pageFacts;
+      checked.push({ facts: judged, ...(shot ? { screenshot: shot.file } : {}) });
       if (url === homeUrl) {
         menu = await checkPhoneMenu(phone.page, {
           device: 'mobile',

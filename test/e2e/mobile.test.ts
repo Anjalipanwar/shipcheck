@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MOBILE } from '../../src/browser/devices.js';
+import { DESKTOP, MOBILE } from '../../src/browser/devices.js';
 import { Evidence } from '../../src/browser/evidence.js';
 import { BrowserSession, type DevicePage } from '../../src/browser/session.js';
+import { dismissCoveringBanners } from '../../src/checks/mobile-banner.js';
 import { collectLayoutFacts } from '../../src/checks/mobile-layout.js';
 import { checkPhoneMenu } from '../../src/checks/mobile-menu.js';
 import { startFixtureServer, type FixtureServer } from '../helpers/fixture-server.js';
@@ -104,6 +105,87 @@ describe('phone layout facts', () => {
   });
 });
 
+describe('covered buttons: close the banner with a safe choice first (owner, 2026-11-15)', () => {
+  const SIGN_UP =
+    '<main><button style="display:block;margin:700px 16px 0;width:200px;height:48px">Sign up</button></main>';
+  const BAR = (buttons: string, extra = '') =>
+    `${SIGN_UP}<div class="cookie-bar">${extra}<p>We use cookies to improve your visit.</p>${buttons}</div>
+     <script>for (const b of document.querySelectorAll('.cookie-bar button')) b.addEventListener('click', () => {
+       document.title = 'tapped: ' + b.textContent;
+       if (b.dataset.closes) document.querySelector('.cookie-bar').remove(); });</script>`;
+  const STYLE =
+    '.cookie-bar{position:fixed;bottom:0;left:0;right:0;height:220px;background:#eee;padding:8px}.cookie-bar button{min-height:44px;margin:4px}';
+  const dismiss = (facts: Awaited<ReturnType<typeof show>>, guardEnabled = true) =>
+    dismissCoveringBanners(phone.page, facts, {
+      device: 'mobile',
+      evidence,
+      ...(guardEnabled ? {} : { guardEnabled: false }),
+    });
+
+  it('“Reject all” is tapped (never “Accept all”); the button is reachable afterwards → closedWith', async () => {
+    const facts = await show(
+      BAR('<button data-closes="1">Accept all</button><button data-closes="1">Reject all</button>'),
+      STYLE,
+    );
+    expect(facts.covered).toHaveLength(1);
+    expect(facts.covered[0]).toMatchObject({
+      control: { label: 'Sign up' },
+      cover: expect.stringMatching(/^xpath=\/html\[1\]\/body\[1\]\/div\[1\]$/),
+      coverText: expect.stringContaining('We use cookies'),
+    });
+    const judged = await dismiss(facts);
+    expect(judged.covered[0]?.closedWith).toBe('Reject all');
+    expect(await phone.page.title()).toBe('tapped: Reject all');
+    expect(evidence.actionLog.map((a) => [a.intent, a.result])).toEqual([
+      ['Close the banner covering a button (“Reject all”)', 'ok'],
+    ]);
+  });
+
+  it('only “Accept all” on the banner → nothing is tapped, the button stays covered', async () => {
+    const facts = await show(BAR('<button data-closes="1">Accept all</button>'), STYLE);
+    const judged = await dismiss(facts, false); // even with the guard off, consent is never given
+    expect(judged).toEqual(facts);
+    expect(judged.covered[0]?.closedWith).toBeUndefined();
+    expect(await phone.page.title()).toBe('');
+    expect(evidence.actionLog).toEqual([]);
+  });
+
+  it('a “Close” button that does not close the banner → tapped once, still covered', async () => {
+    const facts = await show(
+      BAR('<button>Close</button><button data-closes="1">Accept all</button>'),
+      STYLE,
+    );
+    const judged = await dismiss(facts);
+    expect(await phone.page.title()).toBe('tapped: Close');
+    expect(judged.covered[0]?.closedWith).toBeUndefined();
+    expect(evidence.actionLog.map((a) => a.result)).toEqual(['ok']);
+  });
+
+  it('the guard still has the last word: a “Close” button inside a payment form is not tapped', async () => {
+    const facts = await show(
+      BAR(
+        '',
+        '<form><input name="cardnumber" aria-label="Card number"><button data-closes="1" type="button">Close</button></form>',
+      ),
+      STYLE,
+    );
+    const judged = await dismiss(facts);
+    expect(judged.covered[0]?.closedWith).toBeUndefined();
+    expect(await phone.page.title()).toBe('');
+    expect(evidence.actionLog.map((a) => a.result)).toEqual(['blocked']);
+  });
+
+  it('a button covered by the normal layout (no fixed banner) → nothing to close', async () => {
+    const facts = await show(
+      `<main><button style="display:block;width:200px;height:48px">Sign up</button>
+       <div style="margin-top:-48px;height:60px;background:#eee;position:relative">Promo</div></main>`,
+    );
+    expect(facts.covered.map((c) => [c.control.label, c.cover])).toEqual([['Sign up', null]]);
+    expect(await dismiss(facts)).toEqual(facts);
+    expect(evidence.actionLog).toEqual([]);
+  });
+});
+
 describe('phone menu button', () => {
   const MENU = `<header><button class="menu-toggle" aria-label="Menu" aria-expanded="false">☰</button>
     <nav id="nav" hidden><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/signup">Sign up</a></nav></header>`;
@@ -142,6 +224,38 @@ describe('phone menu button', () => {
     expect(result.notTested[0]).toMatch(/^The phone menu — ShipCheck did not tap “Delete account”/);
     expect(await phone.page.title()).not.toBe('clicked');
     expect(evidence.actionLog.map((a) => a.result)).toEqual(['blocked']);
+  });
+
+  it('fixture: /menu-ok.html — the menu opens on a phone (must not be reported)', async () => {
+    await phone.page.goto(`${app.url}/menu-ok.html`);
+    const facts = await collectLayoutFacts(phone.page);
+    expect([facts.cutOff, facts.covered, facts.tooSmall]).toEqual([[], [], []]);
+    expect(facts.pageWidth).toBeLessThanOrEqual(facts.screenWidth + 1);
+    const result = await checkPhoneMenu(phone.page, { device: 'mobile', evidence });
+    expect(result).toEqual({ findings: [], passed: ['The menu opens on a phone'], notTested: [] });
+  });
+
+  it('fixture: /menu-broken.html — planted bug #12, the menu does not open on a phone', async () => {
+    await phone.page.goto(`${app.url}/menu-broken.html`);
+    const facts = await collectLayoutFacts(phone.page);
+    expect([facts.cutOff, facts.covered, facts.tooSmall]).toEqual([[], [], []]);
+    const result = await checkPhoneMenu(phone.page, { device: 'mobile', evidence });
+    expect(result.findings.map((f) => [f.rule, f.severity, f.device])).toEqual([
+      ['mobile/menu-does-not-open', 'major', 'mobile'],
+    ]);
+    expect(result.findings[0]?.whatHappened).toContain('“Menu”');
+  });
+
+  it('fixture: on a desktop both menu pages show their links and no menu button', async () => {
+    const desktop = await session.open(DESKTOP);
+    for (const path of ['/menu-ok.html', '/menu-broken.html']) {
+      await desktop.page.goto(app.url + path);
+      expect(await desktop.page.locator('.menu-button').isVisible(), path).toBe(false);
+      expect(
+        await desktop.page.locator('#site-menu a', { hasText: 'Sign up' }).isVisible(),
+        path,
+      ).toBe(true);
+    }
   });
 
   it('no menu button (links shown directly) → nothing to check', async () => {

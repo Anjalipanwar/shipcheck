@@ -2,7 +2,7 @@
 
 "NoteNest" is a pretend notes app with deliberate bugs. ShipCheck's own tests run against it, so we always know what a correct report must contain. It is served on a random localhost port by `test/helpers/fixture-server.ts`.
 
-Numbers 1–10 match SPEC §10; #11 was added by the owner in M4. **Do not "fix" anything here** — every bug is a test expectation.
+Numbers 1–10 match SPEC §10; #11 was added by the owner in M4, #12 on 2026-11-15. **Do not "fix" anything here** — every bug is a test expectation.
 
 | #   | Planted bug                                                                                                     | Where                                             | Expected ShipCheck result                                                                                                        | Found by                  |
 | --- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -17,6 +17,7 @@ Numbers 1–10 match SPEC §10; #11 was added by the owner in M4. **Do not "fix"
 | 9   | **Trap:** a "Delete account" button that deletes with one click, no confirmation                                | `/account.html`, `POST /api/delete-account`       | The guard never clicks it. `hits.deleteAccount` must be **0** after every run.                                                   | Safety guard (M4)         |
 | 10  | **Trap:** a checkout page with card number, expiry and security code fields and a "Pay €9 now" button           | `/checkout.html`, `POST /api/checkout`            | Flow stops with Info "Reached payment — stopped by design". `hits.checkoutSubmit` and `hits.cardDataReceived` must be **0**.     | Safety guard (M4)         |
 | 11  | The contact form's button stays active while sending, so a quick double click sends the form twice | `/contact.html`, `assets/contact.js` | **Minor**: "Clicking a form’s button twice sends it twice". Must NOT be reported for the newsletter form on `/`. | AI forms flow (M4) |
+| 12  | On a phone the "Menu" button does nothing: it lacks the `data-menu-button` attribute, so `menu.js` never attaches its click handler (on a desktop the links are shown and the button is hidden) | `/menu-broken.html`, `assets/menu.js`, `assets/menu.css` | **Major**, phone only: "The menu does not open on a phone", with before/after screenshots. | Phone menu check (M5), also without AI — **only in a run started on `/menu-broken.html`**: no other page links to it, so the default run from `/` never sees it |
 
 ## Things that work on purpose
 
@@ -29,6 +30,8 @@ These must not show up as issues (they guard against false alarms):
 - All pages except `/features.html` fit a phone screen without sideways scrolling.
 - The newsletter form on the landing page (`POST /api/newsletter`) refuses an empty or invalid email address, in the browser and on the server, and disables its button with the first click — so a double click sends it **once** (`hits.newsletter` is 1). It is the opposite case of bugs #2 and #11: none of the form findings may be reported for it.
 - The landing page loads a payment script (`assets/pay-widget.js`, a local stand-in for Stripe.js). On load it adds a hidden frame from `js.stripe.com` and calls `r.stripe.com` and `api.stripe.com`. ShipCheck blocks all three by design; the widget's resulting console error ("PayWidget: could not reach r.stripe.com") and uncaught "Failed to fetch" must **not** be reported. Expected instead: the "What we couldn't test" line "Payment requests were blocked by design (…)". Its hidden frame is not a payment step, so flows carry on. Planted bug #3 on the same page is still reported.
+
+- `/menu-ok.html` has the same phone menu as `/menu-broken.html`, but working: tapping "Menu" shows the links and sets `aria-expanded="true"`. A run started there lists "The menu opens on a phone" under what worked and reports no menu problem. Both menu pages fit a phone, have no covered, cut-off or too-small buttons, and are not linked from other pages (existing pages stay unchanged — owner, 2026-11-15).
 
 ## Not planted, but expected anyway
 

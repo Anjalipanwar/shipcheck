@@ -5,6 +5,22 @@ import type { ElementFacts } from './guard.js';
 
 const READ_TIMEOUT_MS = 3000;
 
+/**
+ * Page-side helper (plain text, see below): defines `xpathOf(el)`, an exact address of an element
+ * that `readElementFacts` and Playwright (`xpath=…`) both understand.
+ */
+export const XPATH_OF_SOURCE = `const xpathOf = (el) => {
+    const parts = [];
+    for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+      let index = 1;
+      for (let sib = node.previousElementSibling; sib; sib = sib.previousElementSibling) {
+        if (sib.tagName === node.tagName) index += 1;
+      }
+      parts.unshift(node.tagName.toLowerCase() + '[' + index + ']');
+    }
+    return '/' + parts.join('/');
+  };`;
+
 const FactsSchema = z.object({
   tag: z.string(),
   type: z.string(),

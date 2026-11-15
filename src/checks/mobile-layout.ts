@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { z } from 'zod';
+import { XPATH_OF_SOURCE } from '../browser/element.js';
 import { makeFinding, type Finding } from '../report/schema.js';
 import type { CheckResult } from './types.js';
 
@@ -21,6 +22,24 @@ export interface Control {
   height: number;
 }
 
+export interface Covered {
+  control: Control;
+  /** Plain description of what lies on top, e.g. `We use cookies… (div.cookie-bar)`. */
+  by: string;
+  /**
+   * Exact address (`xpath=…`) of the fixed or sticky box the covering element belongs to — a
+   * banner or pop-up that may be closable. Null when the cover is part of the normal layout.
+   */
+  cover: string | null;
+  /** The start of that box's text, to tell a cookie banner from another banner. */
+  coverText: string;
+  /**
+   * Set after ShipCheck closed the cover with a safe button (see mobile-banner.ts) and the
+   * control could then be tapped. Absent: the control stayed covered or nothing was tried.
+   */
+  closedWith?: string;
+}
+
 export interface LayoutFacts {
   url: string;
   screenWidth: number;
@@ -30,7 +49,7 @@ export interface LayoutFacts {
   /** Buttons and menu links that sit (mostly) outside the screen. */
   cutOff: Control[];
   /** Buttons and menu links whose middle is covered by another element. */
-  covered: { control: Control; by: string }[];
+  covered: Covered[];
   /** Targets under 24 × 24 px that are also too close to another target (WCAG 2.5.8). */
   tooSmall: Control[];
   /** How many buttons and menu links were looked at. */
@@ -43,6 +62,7 @@ export interface LayoutFacts {
  * Ordinary links inside text are left out (WCAG 2.5.8 exempts them as well).
  */
 const LAYOUT_SCRIPT = `(() => {
+  ${XPATH_OF_SOURCE}
   const vw = document.documentElement.clientWidth;
   const vh = window.innerHeight;
   const clean = (text) => (text || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
@@ -112,7 +132,15 @@ const LAYOUT_SCRIPT = `(() => {
     if (!hit || el.contains(hit) || hit.contains(el)) continue;
     // A label wrapping or pointing at the control taps the control itself.
     if (hit.closest('label') && hit.closest('label').contains(el)) continue;
-    covered.push({ control: describe(el), by: labelOf(hit).slice(0, 40) + ' (' + tagOf(hit) + ')' });
+    // The outermost fixed or sticky box the cover sits in: a banner or pop-up that might be closable.
+    let overlay = null;
+    for (let node = hit; node && node !== document.body; node = node.parentElement) {
+      const position = getComputedStyle(node).position;
+      if (position === 'fixed' || position === 'sticky') overlay = node;
+    }
+    covered.push({ control: describe(el), by: labelOf(hit).slice(0, 40) + ' (' + tagOf(hit) + ')',
+      cover: overlay ? 'xpath=' + xpathOf(overlay) : null,
+      coverText: overlay ? (overlay.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 200) : '' });
   }
 
   const boxes = controls.map((el) => {
@@ -172,7 +200,14 @@ const LayoutFactsSchema = z.object({
   pageWidth: z.number(),
   widest: z.object({ tag: z.string(), label: z.string(), width: z.number() }).nullable(),
   cutOff: z.array(ControlSchema),
-  covered: z.array(z.object({ control: ControlSchema, by: z.string() })),
+  covered: z.array(
+    z.object({
+      control: ControlSchema,
+      by: z.string(),
+      cover: z.string().nullable(),
+      coverText: z.string(),
+    }),
+  ),
   tooSmall: z.array(ControlSchema),
   controls: z.number(),
 });
@@ -196,7 +231,12 @@ const path = (url: string): string => {
   }
 };
 
-const named = (control: Control): string => `“${control.label}”`;
+const named = (control: Pick<Control, 'label'>): string => `“${control.label}”`;
+
+/** Words that mark a banner as a cookie or consent banner (English and German). */
+export function isCookieBanner(text: string): boolean {
+  return /cookie|consent|gdpr|dsgvo|datenschutz|einwilligung|tracking/i.test(text);
+}
 
 /** "a table", "an image"… — what a visitor would call the element that is too wide. */
 function kindOf(tagName: string): string {
@@ -309,13 +349,16 @@ export function judgeLayout(pages: CheckedPage[]): CheckResult {
     );
   }
 
-  const coveredPages = pages.filter((p) => p.facts.covered.length > 0);
+  // A cover ShipCheck closed with a safe button (and the button could then be tapped) is a
+  // nuisance, not a dead end: Minor. A cover that could not be closed, or a button still covered
+  // afterwards: Major.
+  const stuck = (p: CheckedPage) => p.facts.covered.filter((c) => c.closedWith === undefined);
+  const freed = (p: CheckedPage) => p.facts.covered.filter((c) => c.closedWith !== undefined);
+  const coveredPages = pages.filter((p) => stuck(p).length > 0);
   const firstCovered = coveredPages[0];
   if (firstCovered) {
-    const examples = coveredPages.flatMap((p) =>
-      p.facts.covered.map((c) => ({ ...c, url: p.facts.url })),
-    );
-    const lead = examples[0] as { control: Control; by: string; url: string };
+    const examples = coveredPages.flatMap((p) => stuck(p).map((c) => ({ ...c, url: p.facts.url })));
+    const lead = examples[0] as Covered & { url: string };
     findings.push(
       makeFinding({
         rule: 'mobile/button-covered',
@@ -342,6 +385,50 @@ export function judgeLayout(pages: CheckedPage[]): CheckResult {
           url: firstCovered.facts.url,
         },
         fixPrompt: `On a phone (390 px wide), these buttons in my app are covered by other elements, so taps don't reach them. Please fix the layout (check overlapping positioned elements, z-index and fixed banners) so each button is fully tappable:\n${examples
+          .slice(0, MAX_EXAMPLES)
+          .map((e) => `- ${named(e.control)} (${e.control.tag}) on ${e.url}, covered by ${e.by}`)
+          .join('\n')}`,
+        confidence: 'verified',
+      }),
+    );
+  }
+
+  const freedPages = pages.filter((p) => freed(p).length > 0);
+  const firstFreed = freedPages[0];
+  if (firstFreed) {
+    const examples = freedPages.flatMap((p) => freed(p).map((c) => ({ ...c, url: p.facts.url })));
+    const lead = examples[0] as Covered & { url: string; closedWith: string };
+    const banner = examples.every((e) => isCookieBanner(e.coverText)) ? 'cookie banner' : 'banner';
+    const one = examples.length === 1;
+    findings.push(
+      makeFinding({
+        rule: 'mobile/button-covered-until-closed',
+        title: one
+          ? `A ${banner} covers the ${named(lead.control)} button until it’s closed`
+          : `A ${banner} covers ${examples.length} buttons until it’s closed`,
+        severity: 'minor',
+        category: 'mobile',
+        flow: 'mobile',
+        device: 'mobile',
+        whatHappened: `On a phone-sized screen, a ${banner} lies on top of ${one ? `the ${named(lead.control)} button` : 'some buttons'} when the page opens. ShipCheck closed it with ${named({ label: lead.closedWith })}, and then ${one ? 'the button' : 'the buttons'} could be tapped.`,
+        whyItMatters:
+          'Visitors have to close the banner before they can tap the button. On a small screen that is easy to miss, and some visitors give up instead.',
+        stepsToReproduce: [
+          ...PHONE_STEPS(lead.url),
+          `The ${banner} covers ${named(lead.control)}.`,
+          `Tap ${named({ label: lead.closedWith })}: the banner closes and ${named(lead.control)} can be tapped.`,
+        ],
+        evidence: {
+          screenshots: screenshotsOf(freedPages),
+          logs: examples
+            .slice(0, MAX_EXAMPLES)
+            .map(
+              (e) =>
+                `${e.url}: ${named(e.control)} (${e.control.tag}) is covered by ${e.by} until “${e.closedWith}” is tapped`,
+            ),
+          url: firstFreed.facts.url,
+        },
+        fixPrompt: `On a phone (390 px wide), a ${banner} in my app covers these buttons until the visitor closes it. Please make the banner take less room on small screens (for example a slim bar at the bottom of the screen, with matching bottom padding on the page) so it never sits on top of a main button:\n${examples
           .slice(0, MAX_EXAMPLES)
           .map((e) => `- ${named(e.control)} (${e.control.tag}) on ${e.url}, covered by ${e.by}`)
           .join('\n')}`,
@@ -389,7 +476,7 @@ export function judgeLayout(pages: CheckedPage[]): CheckResult {
   } else if (pages.some((p) => p.facts.controls > 0)) {
     passed.push('Buttons and menu links are big enough to tap on a phone');
   }
-  if (!firstCut && !firstCovered && pages.some((p) => p.facts.controls > 0)) {
+  if (!firstCut && !firstCovered && !firstFreed && pages.some((p) => p.facts.controls > 0)) {
     passed.push('No buttons are cut off or covered on a phone');
   }
   return { findings, passed, notTested: [] };

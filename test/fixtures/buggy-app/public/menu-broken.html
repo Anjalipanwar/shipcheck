@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Why NoteNest — NoteNest</title>
+    <meta name="description" content="NoteNest test fixture page." />
+    <meta property="og:title" content="NoteNest" />
+    <meta property="og:description" content="NoteNest test fixture page." />
+    <meta property="og:image" content="/og.svg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <link rel="stylesheet" href="/assets/menu.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">NoteNest</a>
+      <!-- Planted bug #12: no data-menu-button attribute, so menu.js never attaches the click handler. -->
+      <button class="menu-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-menu">Menu</button>
+      <nav id="site-menu" class="site-menu" aria-label="Main">
+        <a href="/features.html">Features</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/login.html">Log in</a>
+        <a class="button small" href="/signup.html">Sign up</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Why NoteNest</h1>
+      <p>On a phone, the Menu button should open the menu.</p>
+    </main>
+    <footer class="site-footer">
+      <p>NoteNest is a pretend app used to test ShipCheck. Nothing here is real.</p>
+    </footer>
+    <script src="/assets/menu.js"></script>
+  </body>
+</html>

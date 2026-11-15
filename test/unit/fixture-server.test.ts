@@ -36,6 +36,8 @@ describe('buggy-app fixture: pages', () => {
     ['/dashboard.html', 'Your notes'],
     ['/account.html', 'Delete account'],
     ['/checkout.html', 'Card number'],
+    ['/menu-ok.html', 'Get started'],
+    ['/menu-broken.html', 'Why NoteNest'],
   ])('serves %s', async (path, marker) => {
     const response = await get(path);
     expect(response.status).toBe(200);
@@ -131,6 +133,13 @@ describe('buggy-app fixture: planted bugs are really there', () => {
     expect(await (await get('/assets/styles.css')).text()).toMatch(
       /\.plans\s*\{[^}]*width:\s*900px/,
     );
+  });
+
+  it('#12 the phone menu button on /menu-broken.html never gets a handler; /menu-ok.html’s does', async () => {
+    const button = (html: string) => /<button class="menu-button"[^>]*>/.exec(html)?.[0] ?? '';
+    expect(button(await (await get('/menu-broken.html')).text())).not.toContain('data-menu-button');
+    expect(button(await (await get('/menu-ok.html')).text())).toContain('data-menu-button');
+    expect(await (await get('/assets/menu.js')).text()).toContain('[data-menu-button]');
   });
 
   it('#9 delete-account endpoint counts every hit', async () => {

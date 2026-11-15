@@ -288,6 +288,29 @@ describe('safety (SPEC §7)', () => {
   });
 });
 
+describe('planted bug #12 — runs started on the menu pages (they are not linked from other pages)', () => {
+  const run = async (path: string) =>
+    (await runShipCheck(loadConfig(app.url + path, { ai: false, yes: true }, {}))).report;
+
+  it('/menu-broken.html → Major “The menu does not open on a phone”, phone only', async () => {
+    const menu = (await run('/menu-broken.html')).findings.filter((f) => f.rule.includes('menu'));
+    expect(menu.map((f) => [f.rule, f.severity, f.device, f.title])).toEqual([
+      ['mobile/menu-does-not-open', 'major', 'mobile', 'The menu does not open on a phone'],
+    ]);
+    expect(menu[0]?.evidence.screenshots).toHaveLength(2);
+  });
+
+  it('/menu-ok.html → no menu finding, “The menu opens on a phone” under what worked', async () => {
+    const report = await run('/menu-ok.html');
+    expect(report.findings.filter((f) => f.rule.includes('menu'))).toEqual([]);
+    expect(report.passed).toContain('The menu opens on a phone');
+  });
+
+  it('the default run from “/” never reaches the menu pages', () => {
+    expect(report.actionLog.some((a) => /menu-(ok|broken)/.test(a.url ?? ''))).toBe(false);
+  });
+});
+
 describe('robustness', () => {
   it('an app that does not load → one Blocker, a written report, no crash', async () => {
     const dead = await startFixtureServer();

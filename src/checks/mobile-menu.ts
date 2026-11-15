@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
 import { z } from 'zod';
 import type { DeviceName } from '../browser/devices.js';
-import { readElementFacts } from '../browser/element.js';
+import { readElementFacts, XPATH_OF_SOURCE } from '../browser/element.js';
 import type { Evidence } from '../browser/evidence.js';
 import { judgeAction, type ProposedAction } from '../browser/guard.js';
 import { makeFinding } from '../report/schema.js';
@@ -21,17 +21,7 @@ const FIND_TOGGLE = `(() => {
     const style = getComputedStyle(el);
     return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
   };
-  const xpathOf = (el) => {
-    const parts = [];
-    for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
-      let index = 1;
-      for (let sib = node.previousElementSibling; sib; sib = sib.previousElementSibling) {
-        if (sib.tagName === node.tagName) index += 1;
-      }
-      parts.unshift(node.tagName.toLowerCase() + '[' + index + ']');
-    }
-    return '/' + parts.join('/');
-  };
+  ${XPATH_OF_SOURCE}
   const candidates = [...document.querySelectorAll(
     'button[aria-expanded], [role="button"][aria-expanded], button[aria-controls], ' +
     'button[aria-label*="menu" i], [role="button"][aria-label*="menu" i], ' +

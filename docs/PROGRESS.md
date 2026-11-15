@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-14, after M5
-- **Next up:** M6 — AI judge, fix prompts, dedupe (waiting for the owner's "go")
+- **Last updated:** 2026-11-15, M5 follow-ups
+- **Next up:** real-app run (`--no-ai` and AI) and a short summary for the owner; then M6 — AI judge, fix prompts, dedupe, **only after the owner's "go"**
 
 ## Overview
 
@@ -15,7 +15,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M2 — Browser session, evidence, deterministic checks | done        | `6498102` | yes    |
 | M3 — Report renderer and verdict                     | done        | `8e0b406` | yes    |
 | M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63` | yes    |
-| M5 — Mobile pass                                     | done        | `f168b9e` | no     |
+| M5 — Mobile pass                                     | done        | `f168b9e` | yes    |
 | M6 — AI judge, fix prompts, dedupe                   | not started | —         | —      |
 | M7 — CLI polish                                      | not started | —         | —      |
 | M8 — GitHub Action                                   | not started | —         | —      |
@@ -186,7 +186,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - **Status:** done
 - **Commit:** `215e69a`
-- **Pushed:** no — waiting for the owner's answer
+- **Pushed:** yes (2026-11-15, with `f168b9e` and `11bf00a`; CI green for `11bf00a`)
 
 **What was built**
 
@@ -212,7 +212,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - **Status:** done
 - **Commit:** `f168b9e`
-- **Pushed:** no — waiting for the owner's answer
+- **Pushed:** yes (2026-11-15; CI run for `11bf00a` completed with success)
 
 **What was built:** the phone-sized pass (iPhone, 390×844, touch, mobile browser identity).
 
@@ -227,18 +227,54 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 **Tests:** 408 unit tests, 99 real-browser tests, 11 real-AI tests. The new real-browser tests use synthetic phone pages for each rule and each exception (closed drawer menu, carousel, icon inside a button, a lone small button with space around it, links inside text), and for the menu check (opens, does not open, refused by the guard).
 
-**Builder's choices awaiting owner feedback** (details in `docs/SPEC.md` §13)
+**Builder's choices** (details in `docs/SPEC.md` §13)
 
-1. Sign-up is repeated on the phone (needed for bug #1; §6.1 names only landing and login/main feature).
+1. Sign-up is repeated on the phone (needed for bug #1; §6.1 names only landing and login/main feature). **Approved by the owner on 2026-11-15**; SPEC §6.1 and §13 updated.
 2. Phone layout checks also run with `--no-ai`.
-3. Severities: sideways scrolling Minor, cut-off or covered button Major, small tap targets Minor (WCAG 2.5.8).
+3. Severities: sideways scrolling Minor, cut-off or covered button Major, small tap targets Minor (WCAG 2.5.8). Covered buttons refined by the owner on 2026-11-15 (see M5 follow-ups).
 4. Menu check taps the first menu-like header button once, guarded.
 5. Merge rules for desktop + phone; phone flows need at least 10 AI calls left.
 
 **Open questions**
 
-- The fixture has no menu button, so the menu check is proven only with synthetic pages. Add a hamburger menu to a fixture page (would change the fixture's phone layout)?
-- The "covered button" rule also fires for a fixed chat or cookie banner that covers a button at load. That is real for the visitor, but such banners can be closed. Keep it Major, or make it Minor?
+- ~~Menu button in the fixture?~~ Answered 2026-11-15: two new pages, existing pages unchanged (see M5 follow-ups).
+- ~~Covered by a closable banner: Major or Minor?~~ Answered 2026-11-15: close it safely first, then decide (see M5 follow-ups).
+- Choices 2, 4 and 5 above have no explicit owner answer yet.
+
+---
+
+## M5 follow-ups (owner decisions of 2026-11-15)
+
+- **Status:** done
+- **Commit:** see the next progress-log commit
+- **Pushed:** no — waiting for the owner's answer
+
+**Owner decisions (2026-11-15)**
+
+1. Push `215e69a`, `f168b9e`, `11bf00a` — done; CI for `11bf00a` completed with success.
+2. Sign-up on the phone: approved. SPEC §6.1 flow 6 and §13 updated.
+3. Covered buttons: first try to close the covering banner with a safe choice only ("Close", "Reject", "Only necessary"; never "Accept all"), through the guard. Reachable afterwards → Minor with a note; cannot be closed or still covered → Major. Unit-test both.
+4. Menu check: existing fixture pages stay unchanged; two new pages, one working menu (must not be reported) and one broken (planted bug #12). BUGS.md updated.
+5. Before M6: run ShipCheck (`--no-ai` and AI) on the owner's real app and send a short summary (findings, likely false alarms, clear misses, AI calls). Wait for "go" on M6 after that.
+
+**What was built**
+
+- `src/checks/mobile-banner.ts`: finds the fixed/sticky box covering a button, picks a safe button inside it (reject → only necessary → close; consent words veto a button even if it also says "close"), asks the guard, taps once, measures again. `judgeLayout` stays pure: the result is a `closedWith` note on the covered button → Minor `mobile/button-covered-until-closed`, otherwise Major `mobile/button-covered`. The screenshot is taken before the tap, so it shows the banner.
+- Fixture: `/menu-ok.html`, `/menu-broken.html` (bug #12), `assets/menu.js`, `assets/menu.css`. No existing fixture file changed.
+- Small refactor: the page-side "element address" helper is shared (`XPATH_OF_SOURCE` in `browser/element.ts`).
+
+**How it was verified**
+
+- `npm run typecheck`, `npm run lint`, `npm test` (446 unit tests), `npm run test:e2e` (110 real-browser tests) all pass.
+- Unit: both outcomes in `judgeLayout` (Minor with the note; Major), both in one run, "banner" vs "cookie banner"; the safe-choice list with 12 allowed and 19 refused labels (including "Accept & close", "Close account", "OK", "Got it").
+- Real browser: "Reject all" is tapped and never "Accept all"; only "Accept all" → nothing tapped (even with the guard switched off); a "Close" that does not close → still covered; a "Close" inside a payment form → refused by the guard; a cover that is not a banner → nothing tried.
+- Bug #12: full `--no-ai` runs started on each page — `/menu-broken.html` gives exactly one Major "The menu does not open on a phone" (phone, two screenshots), `/menu-ok.html` gives none and lists "The menu opens on a phone". The default run from `/` never reaches either page.
+- Deliberate breakages, each caught: guard skipped (1 test failed); consent veto removed and "accept all" added to the safe list (4 tests failed).
+
+**Open questions**
+
+- Bug #12 only shows in a run started on its own page. Should the menu check also run on the other pages of the phone pass (up to 5), not just the start page?
+- Real-app run: needs the app's address and the owner's confirmation that they own it or may test it.
 
 ---
 
