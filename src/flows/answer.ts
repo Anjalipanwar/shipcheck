@@ -5,6 +5,8 @@ import type { FlowContext, Snapshot } from './context.js';
 const REDIRECT_WAIT_MS = 10_000;
 /** How long to wait for the app to send the form's request at all. */
 const ANSWER_WAIT_MS = 3_000;
+/** How long to wait for the form to leave the screen once the page address has changed. */
+const SCREEN_WAIT_MS = 5_000;
 
 type Answer = { status: number };
 
@@ -54,6 +56,16 @@ export function watchSubmission(ctx: FlowContext, typed: readonly string[]): Sub
       let after = firstLook;
       if (ctx.page.url() !== before.url || answers().length > 0) {
         await ctx.settle(); // let the new page, or the error message, appear
+        // Some apps change the address first and load the screen behind it afterwards: for a
+        // moment the new address still shows the old form. Give the form time to go away.
+        const moved = Date.now();
+        while (
+          ctx.page.url() !== before.url &&
+          Date.now() - moved < SCREEN_WAIT_MS &&
+          (await ctx.page.locator('input[type="password"]:visible').count()) > 0
+        ) {
+          if (!(await ctx.pause(250))) break;
+        }
         after = await ctx.snapshot();
       }
       ctx.evidence.watch([]);

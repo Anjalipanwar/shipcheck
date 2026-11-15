@@ -86,6 +86,18 @@ describe('false alarms from the real-app run', () => {
     expect(found[0]?.whatHappened).toContain('Invalid login credentials');
   });
 
+  it('an app that changes the address first and shows the screen later is seen as logged in', async () => {
+    const { report } = await run('/slow-login.html?lazy=1', 'login', {}, {}, DEMO_ACCOUNT);
+    expect(problems(report, 'login/').map((f) => `${f.severity}: ${f.title}`)).toEqual([]);
+    expect(report.passed).toEqual(
+      expect.arrayContaining([
+        'Logging in with the correct password works',
+        'Users stay logged in after refreshing the page',
+      ]),
+    );
+    expect(report.coverage.find((e) => e.area === 'login')?.state).toBe('no-problems');
+  });
+
   it('a message left over from the wrong password is not proof that the right one failed', async () => {
     // The server accepts the log-in and the app opens in place (same address), but the old
     // "Invalid login credentials" still stands on the page. Not a Blocker: "Not tested".
