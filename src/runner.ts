@@ -26,6 +26,14 @@ import { checkSecrets, type SecretSource } from './checks/secrets.js';
 import { checkSeo } from './checks/seo.js';
 import type { CheckResult } from './checks/types.js';
 import type { Config } from './config.js';
+import {
+  CoverageRecorder,
+  flowOutcome,
+  phoneOutcome,
+  reasonOf,
+  withAdvice,
+  type Outcome,
+} from './coverage.js';
 import { FLOW_LABEL, runFlow, type FlowBody } from './flows/context.js';
 import { coreFlow } from './flows/core.js';
 import { formsFlow } from './flows/forms.js';
@@ -33,7 +41,9 @@ import { landingFlow } from './flows/landing.js';
 import { loginFlow } from './flows/login.js';
 import { signupFlow } from './flows/signup.js';
 import type { FlowDeps, FlowName, FlowResult, Observation, SharedState } from './flows/types.js';
-import { makeFinding, type Finding, type Report } from './report/schema.js';
+import { ADVICE, AREA_LABEL, NEEDS_FULL_CHECK } from './report/present.js';
+import { redactDeep } from './report/write.js';
+import { makeFinding, type CoverageArea, type Finding, type Report } from './report/schema.js';
 import { computeVerdict, countBySeverity, rankFindings } from './report/verdict.js';
 import { VERSION } from './version.js';
 
@@ -111,6 +121,9 @@ const FLOWS: Record<Exclude<FlowName, 'mobile'>, FlowBody> = {
 
 /** Flows repeated on the phone (SPEC §6.1 flow 6; signup too, because of planted bug #1). */
 export const PHONE_FLOWS = ['landing', 'signup', 'login', 'core'] as const;
+/** Coverage areas that need the AI tester (everything a visitor does). */
+const USER_AREAS: readonly CoverageArea[] = ['signup', 'login', 'core', 'forms', 'phone-flows'];
+const USED_FLOWS = 'you used --flows';
 /** A phone flow is only started if at least this many AI calls are left. */
 export const PHONE_FLOW_MIN_CALLS = 10;
 /** Pages checked for phone layout: the home page and up to this many linked pages. */
@@ -160,6 +173,7 @@ export async function runShipCheck(
   evidence.protect(config.password);
   evidence.protect(options.model?.apiKey);
   const collector = new Collector();
+  const coverage = new CoverageRecorder();
   const useAi = !config.noAi;
   if (useAi && !options.model && !options.aiDriver) {
     throw new Error('runShipCheck needs a model (or --no-ai)');
@@ -170,10 +184,27 @@ export async function runShipCheck(
   });
   const cdpPort = useAi && !options.aiDriver ? await freePort() : undefined;
 
-  /** Runs one named check with a timeout, inside the global time budget. */
-  const step = async (label: string, work: () => Promise<CheckResult> | CheckResult) => {
+  /**
+   * Runs one named check with a timeout, inside the global time budget, and records whether its
+   * area of the coverage table was really tested.
+   */
+  const step = async (
+    label: string,
+    area: CoverageArea | null, // page speed is not one of the table's areas
+    work: () => Promise<CheckResult> | CheckResult,
+  ) => {
+    const mark = (outcome: Outcome) => {
+      if (area) coverage.mark(area, outcome);
+    };
+    const blocked = (reason: string, advice: string): Outcome => ({
+      state: 'not-tested',
+      note: withAdvice(noteFor(reason), advice),
+    });
+    // Areas made of several checks (basic security) say which one is missing.
+    const noteFor = (reason: string) => (area === 'security' ? `${label}: ${reason}` : reason);
     const remaining = deadline - Date.now();
     if (remaining <= 0) {
+      mark(blocked('the time limit was reached', ADVICE.time));
       collector.partial = true;
       collector.notTested.push(
         `${label} — the time limit of ${config.maxMinutes} minutes was reached`,
@@ -187,8 +218,18 @@ export async function runShipCheck(
         Math.min(CHECK_TIMEOUT_MS, remaining),
       );
       collector.add(result);
+      // Untested only when the check could say nothing but "not tested" — a page without
+      // links, for example, was checked and simply had nothing to report.
+      const ran =
+        result.findings.length > 0 || result.passed.length > 0 || result.notTested.length === 0;
+      mark(
+        ran
+          ? { state: 'tested' }
+          : blocked(reasonOf(result.notTested[0] ?? 'nothing could be checked'), ADVICE.byHand),
+      );
       progress(`${label}… ${summarize(result)}`);
     } catch {
+      mark(blocked('this check could not finish', ADVICE.retry));
       collector.notTested.push(`${label} — this check could not finish`);
       progress(`${label}… could not finish`);
     }
@@ -201,12 +242,14 @@ export async function runShipCheck(
     ...(cdpPort ? { cdpPort } : {}),
   });
   let ai: AiDriver | undefined;
+  let landingLoaded: boolean;
   try {
     const desktop = await session.open(DESKTOP);
     const userAgent = session.userAgentFor(DESKTOP);
     const fetchOptions = { lock: session.lock, userAgent };
 
     const landing = await openLanding(desktop, config.url, evidence, collector, progress);
+    landingLoaded = landing !== undefined;
     if (landing) {
       const { facts, headers, finalUrl } = landing;
       const origin = new URL(finalUrl).origin;
@@ -214,7 +257,7 @@ export async function runShipCheck(
       const a11y: A11yViolation[] = [];
       let a11yPages = 0;
 
-      await step('Secure connection (HTTPS)', () =>
+      await step('Secure connection (HTTPS)', 'security', () =>
         checkHttps({
           targetUrl: config.url,
           finalUrl,
@@ -223,13 +266,13 @@ export async function runShipCheck(
           ),
         }),
       );
-      await step('Security settings', () => checkHeaders({ url: finalUrl, headers }));
-      await step('Page speed', async () =>
+      await step('Security settings', 'security', () => checkHeaders({ url: finalUrl, headers }));
+      await step('Page speed', null, async () =>
         checkPerformance({ url: finalUrl, ...(await collectTimings(desktop.page)) }),
       );
 
       const rawHtml = await safeFetch(finalUrl, fetchOptions);
-      await step('Search engine basics (SEO)', async () => {
+      await step('Search engine basics (SEO)', 'seo', async () => {
         const exists = async (path: string): Promise<boolean | null> => {
           const result = await safeFetch(origin + path, fetchOptions);
           if (result.error) return null;
@@ -289,9 +332,9 @@ export async function runShipCheck(
           evidence.setScope(undefined);
         }
       }
-      await step('Accessibility basics', () => checkA11y(a11y, a11yPages));
+      await step('Accessibility basics', 'accessibility', () => checkA11y(a11y, a11yPages));
 
-      await step('Exposed secret keys', async () => {
+      await step('Exposed secret keys', 'security', async () => {
         const sources: SecretSource[] = [
           { url: finalUrl, content: renderedHtml },
           ...(rawHtml.error ? [] : [{ url: finalUrl, content: rawHtml.body }]),
@@ -308,7 +351,7 @@ export async function runShipCheck(
         return checkSecrets(sources);
       });
 
-      await step('Broken links and images', () =>
+      await step('Broken links and images', 'links', () =>
         checkLinks(
           selectLinkTargets(pages, session.lock),
           async (url, method): Promise<LinkProbe> => {
@@ -336,6 +379,12 @@ export async function runShipCheck(
         collector.notTested.push(
           'Signing up, logging in, the main feature and forms — the AI tester could not start',
         );
+        for (const area of USER_AREAS) {
+          coverage.mark(area, {
+            state: 'not-tested',
+            note: withAdvice('the AI tester could not start', ADVICE.key),
+          });
+        }
         progress('Starting the AI tester… could not start');
       }
     }
@@ -390,6 +439,12 @@ export async function runShipCheck(
     let shared: SharedState = { loggedIn: false };
     if (ai && landing) {
       desktopResults.push(...(await runFlows(DESKTOP, config.flows, shared, desktop)));
+      for (const area of ['signup', 'login', 'core', 'forms'] as const) {
+        const result = desktopResults.find((r) => r.name === area);
+        if (!config.flows.includes(area))
+          coverage.mark(area, { state: 'skipped', note: USED_FLOWS });
+        else if (result) coverage.mark(area, flowOutcome(result));
+      }
       for (const result of desktopResults) {
         for (const observation of result.observations) {
           if (observation.ok) collector.passed.push(observation.title);
@@ -406,18 +461,39 @@ export async function runShipCheck(
     // The phone-sized pass (SPEC §6.1 flow 6). Layout checks need no AI; flows run if they can.
     if (landing && !config.skipMobile && Date.now() < deadline) {
       const phone = await session.open(MOBILE);
-      await step('Phone layout', () =>
+      await step('Phone layout', 'phone-layout', () =>
         phoneLayout(phone, landing.finalUrl, facts(landing), session, evidence, options),
       );
       if (ai) {
         shared = { loggedIn: false, ...(shared.account ? { account: shared.account } : {}) };
         const names = PHONE_FLOWS.filter((name) => config.flows.includes(name));
-        const phoneResults = await runFlows(MOBILE, names, shared, phone, (name) =>
-          budget.remaining < PHONE_FLOW_MIN_CALLS
-            ? `${FLOW_LABEL[name]} on a phone — skipped to stay within the limit of ${budget.maxCalls} AI calls for one run`
-            : undefined,
-        );
+        const skippedOnPhone = new Map<string, string>();
+        const phoneResults = await runFlows(MOBILE, names, shared, phone, (name) => {
+          if (budget.remaining >= PHONE_FLOW_MIN_CALLS) return undefined;
+          const reason = `ShipCheck reached its limit of ${budget.maxCalls} AI calls for one run`;
+          skippedOnPhone.set(name, withAdvice(reason, ADVICE.calls));
+          return `${FLOW_LABEL[name]} on a phone — skipped to stay within the limit of ${budget.maxCalls} AI calls for one run`;
+        });
         mergePhoneResults(phoneResults, desktopResults, collector);
+        coverage.mark(
+          'phone-flows',
+          names.length === 0
+            ? { state: 'skipped', note: USED_FLOWS }
+            : phoneOutcome(
+                names.map((name) => {
+                  const result = phoneResults.find((r) => r.name === name);
+                  const label = name === 'landing' ? 'Landing page' : AREA_LABEL[name];
+                  // What the app does not have on desktop, it does not have on a phone either
+                  // (there the link may only be hidden in a menu): never "not tested".
+                  const desktop = desktopResults.find((r) => r.name === name);
+                  const onDesktop = desktop ? flowOutcome(desktop) : undefined;
+                  if (onDesktop?.state === 'absent') return { label, ...onDesktop };
+                  return result
+                    ? { label, ...flowOutcome(result) }
+                    : { label, state: 'not-tested' as const, note: skippedOnPhone.get(name) };
+                }),
+              ),
+        );
       } else {
         await phone.context.close().catch(() => undefined);
       }
@@ -425,7 +501,9 @@ export async function runShipCheck(
 
     // Last, because it looks at everything that happened during the run. Errors caused by
     // ShipCheck's own blocking are taken out first: they are never the app's fault.
-    await step('Hidden errors', () => checkErrors(separateShipCheckBlocking(evidence.events).app));
+    await step('Hidden errors', 'errors', () =>
+      checkErrors(separateShipCheckBlocking(evidence.events).app),
+    );
   } finally {
     await ai?.close();
     await session.close();
@@ -433,7 +511,7 @@ export async function runShipCheck(
 
   if (config.noAi) {
     collector.notTested.push(
-      `Signing up, logging in, the main feature and forms, on desktop and on a phone — these need an AI key (this run used --no-ai)${config.skipMobile ? '' : '. The phone layout was checked'}`,
+      `Signing up, logging in, the main feature and forms, on desktop and on a phone — these need the full check (this run was automatic checks only)${config.skipMobile ? '' : '. The phone layout was checked'}`,
     );
   } else {
     const left = (['landing', 'signup', 'login', 'core', 'forms'] as const).filter(
@@ -453,7 +531,23 @@ export async function runShipCheck(
   );
   const llm = useAi ? budget.summary() : undefined;
 
+  if (!landingLoaded) {
+    coverage.failAll(withAdvice('the home page did not load', ADVICE.fixHome));
+  }
   const findings = rankFindings(collector.findings);
+  const covered = coverage.build(findings, (area) => {
+    if (USER_AREAS.includes(area) && config.noAi) {
+      return { state: 'not-tested', note: NEEDS_FULL_CHECK };
+    }
+    if ((area === 'phone-flows' || area === 'phone-layout') && config.skipMobile) {
+      return { state: 'skipped', note: 'you used --skip-mobile' };
+    }
+    return {
+      state: 'not-tested',
+      note: withAdvice('ShipCheck ran out of time before this part', ADVICE.time),
+    };
+  });
+  const mode = useAi ? 'full' : 'no-ai';
   const report: Report = {
     meta: {
       url: config.url,
@@ -461,20 +555,22 @@ export async function runShipCheck(
       durationMs: Date.now() - startedAt.getTime(),
       model: useAi ? (options.model?.stagehandModel ?? 'scripted') : null,
       shipcheckVersion: VERSION,
-      mode: useAi ? 'full' : 'no-ai',
+      mode,
       partial: collector.partial,
       llmCalls: llm?.total ?? 0,
       ...(llm ? { llmCallsByFlow: llm.byFlow, llmCallLimit: llm.max } : {}),
     },
-    verdict: computeVerdict(findings),
+    verdict: computeVerdict(findings, { mode, coverage: covered }),
     counts: countBySeverity(findings),
     findings,
     passed: collector.passed,
     notTested: collector.notTested,
+    coverage: covered,
     actionLog: evidence.actionLog,
   };
   return {
-    report,
+    // Scrubbed here, so that every consumer — files, step summary, terminal — is safe (§7.6).
+    report: redactDeep(report, (text) => evidence.redact(text)),
     screenshots: evidence.screenshots,
     redact: (text) => evidence.redact(text),
     ...(llm ? { llm } : {}),

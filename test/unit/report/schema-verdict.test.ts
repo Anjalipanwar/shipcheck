@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ReportSchema,
   findingId,
   makeFinding,
   type FindingInput,
   type Severity,
 } from '../../../src/report/schema.js';
 import { computeVerdict, countBySeverity, rankFindings } from '../../../src/report/verdict.js';
+import { coverageFor, makeReport } from './fixtures.js';
 
 const base: FindingInput = {
   rule: 'test/rule',
@@ -51,20 +53,104 @@ describe('makeFinding', () => {
   });
 });
 
-describe('verdict rules (SPEC §5.3)', () => {
-  it('no findings → ready', () => {
-    expect(computeVerdict([])).toBe('ready');
+describe('verdict rules (SPEC §5.3, owner decision 2026-11-15)', () => {
+  const allTested = coverageFor('full');
+  const full = { mode: 'full' as const, coverage: allTested };
+  const noAi = { mode: 'no-ai' as const, coverage: coverageFor('no-ai') };
+
+  it('full run, everything tested: no findings or only minor/info → ready', () => {
+    expect(computeVerdict([], full)).toBe('ready');
+    expect(computeVerdict([finding('minor'), finding('info')], full)).toBe('ready');
   });
-  it('only minor and info → ready', () => {
-    expect(computeVerdict([finding('minor'), finding('info')])).toBe('ready');
+  it('full run: any major, no blocker → fix before launch', () => {
+    expect(computeVerdict([finding('minor'), finding('major')], full)).toBe('fix-before-launch');
   });
-  it('any major, no blocker → fix before launch', () => {
-    expect(computeVerdict([finding('minor'), finding('major')])).toBe('fix-before-launch');
-  });
-  it('any blocker → not ready, even next to majors', () => {
-    expect(computeVerdict([finding('major'), finding('blocker'), finding('info')])).toBe(
+  it('full run: any blocker → not ready, even next to majors', () => {
+    expect(computeVerdict([finding('major'), finding('blocker'), finding('info')], full)).toBe(
       'not-ready',
     );
+  });
+  it('full run with an untested area (stopped early, skipped, blocked) → partly tested, never ready', () => {
+    const stopped = {
+      mode: 'full' as const,
+      coverage: coverageFor('full', { core: 'stopped early' }),
+    };
+    expect(computeVerdict([], stopped)).toBe('partly-tested');
+    expect(computeVerdict([finding('minor')], stopped)).toBe('partly-tested');
+    // Problems found still decide: an incomplete run can always say "not ready".
+    expect(computeVerdict([finding('major')], stopped)).toBe('fix-before-launch');
+    expect(computeVerdict([finding('blocker')], stopped)).toBe('not-ready');
+  });
+  it('skipped by the user’s choice or not in the app does not block “ready”; a partly tested area does', () => {
+    const byChoice = {
+      mode: 'full' as const,
+      coverage: coverageFor('full', {
+        signup: { state: 'skipped', note: 'you gave a test account' },
+        forms: { state: 'absent', note: 'no form was found' },
+        'phone-flows': { state: 'skipped', note: 'you used --skip-mobile' },
+      }),
+    };
+    expect(computeVerdict([], byChoice)).toBe('ready');
+    const minorInBlockedArea = coverageFor('full', { seo: 'could not finish. Try again.' }, [
+      makeFinding({ ...base, severity: 'minor', category: 'seo' }),
+    ]);
+    expect(minorInBlockedArea.find((e) => e.area === 'seo')).toMatchObject({
+      state: 'problems',
+      partial: true,
+    });
+    expect(computeVerdict([finding('minor')], { mode: 'full', coverage: minorInBlockedArea })).toBe(
+      'partly-tested',
+    );
+  });
+  it('--no-ai: nothing or only Info → checks passed; anything else → checks found issues', () => {
+    expect(computeVerdict([], noAi)).toBe('checks-passed');
+    expect(computeVerdict([finding('info')], noAi)).toBe('checks-passed');
+    expect(computeVerdict([finding('minor')], noAi)).toBe('checks-found-issues');
+    expect(computeVerdict([finding('blocker')], noAi)).toBe('checks-found-issues');
+  });
+
+  it('--no-ai can never be “ready”: every mix of severities and coverage', () => {
+    const severities: Severity[] = ['blocker', 'major', 'minor', 'info'];
+    const mixes = Array.from({ length: 16 }, (_, bits) =>
+      severities.filter((_, i) => bits & (1 << i)).map((s) => finding(s)),
+    );
+    const coverages = [
+      coverageFor('no-ai'),
+      coverageFor('full'),
+      coverageFor('no-ai', { seo: 'x' }),
+    ];
+    for (const findings of mixes) {
+      for (const coverage of coverages) {
+        const verdict = computeVerdict(findings, { mode: 'no-ai', coverage });
+        expect(['checks-passed', 'checks-found-issues']).toContain(verdict);
+      }
+    }
+  });
+
+  it('the report schema refuses a verdict that promises more than was tested', () => {
+    const ok = makeReport();
+    expect(() => ReportSchema.parse(ok)).not.toThrow();
+    expect(() => ReportSchema.parse({ ...ok, verdict: 'ready' })).toThrow(/--no-ai/);
+    expect(() => ReportSchema.parse({ ...ok, verdict: 'not-ready' })).toThrow(/--no-ai/);
+    const fullReport = makeReport([], {
+      meta: { ...ok.meta, mode: 'full', model: 'm', llmCalls: 3 },
+    });
+    expect(fullReport.verdict).toBe('ready');
+    expect(() => ReportSchema.parse(fullReport)).not.toThrow();
+    expect(() =>
+      ReportSchema.parse({ ...fullReport, coverage: coverageFor('full', { login: 'skipped' }) }),
+    ).toThrow(/marked not tested/);
+    expect(() => ReportSchema.parse({ ...fullReport, verdict: 'checks-passed' })).toThrow(
+      /--no-ai runs/,
+    );
+    // An empty or incomplete table cannot sneak a "ready" through.
+    expect(() => ReportSchema.parse({ ...fullReport, coverage: [] })).toThrow(/each area/);
+    expect(() =>
+      ReportSchema.parse({
+        ...fullReport,
+        coverage: [...fullReport.coverage, fullReport.coverage[0]],
+      }),
+    ).toThrow(/each area/);
   });
 
   it('counts per severity', () => {

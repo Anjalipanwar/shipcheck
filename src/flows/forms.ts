@@ -327,6 +327,7 @@ export const formsFlow: FlowBody = async (ctx) => {
   if (tested === 0) {
     ctx.skip(
       'Forms — no form (other than log-in, sign-up or payment) was found on the home page or on contact-like pages linked from it',
+      { kind: 'absent', reason: 'ShipCheck found no form besides log-in and sign-up' },
     );
   }
 };

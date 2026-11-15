@@ -7,7 +7,7 @@ import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ProposedAction } from '../../src/browser/guard.js';
 import { loadConfig } from '../../src/config.js';
-import { ReportSchema, type Report } from '../../src/report/schema.js';
+import { isUntested, ReportSchema, type Report } from '../../src/report/schema.js';
 import { runShipCheck, type RunResult } from '../../src/runner.js';
 import { createScriptedDriver } from '../helpers/scripted-driver.js';
 import { DEMO_ACCOUNT, startFixtureServer, type FixtureServer } from '../helpers/fixture-server.js';
@@ -24,6 +24,16 @@ const clickAt = (selector: string, description: string): ProposedAction => ({
   method: 'click',
   arguments: [],
 });
+
+const coverageOf = (report: Report) =>
+  Object.fromEntries(
+    report.coverage.map((e) => [
+      e.area,
+      e.state === 'no-problems' || e.state === 'problems'
+        ? `✓${e.partial ? ` partly: ${e.note ?? ''}` : ''}`
+        : `${e.state}: ${e.note ?? ''}`,
+    ]),
+  );
 
 describe('full run with all five flows', () => {
   let app: FixtureServer;
@@ -217,6 +227,15 @@ describe('full run with all five flows', () => {
     for (const value of typed) expect(value).toBe('[hidden]');
   });
 
+  it('coverage: a complete full run tested all 11 areas, so the verdict comes from the findings', () => {
+    expect(report.coverage.filter(isUntested)).toEqual([]);
+    expect(report.coverage.filter((e) => e.state === 'skipped' || e.state === 'absent')).toEqual(
+      [],
+    );
+    expect(report.coverage).toHaveLength(11);
+    expect(report.verdict).toBe('not-ready');
+  });
+
   it('counts every AI call, per run and per flow', () => {
     expect(result.llm).toBeDefined();
     const byFlow = result.llm?.byFlow ?? {};
@@ -402,6 +421,17 @@ describe('budgets', () => {
       expect(() => ReportSchema.parse(result.report)).not.toThrow();
       // The automatic checks are unaffected by the AI budget.
       expect(rules(result.report)).toContain('secrets/stripe-secret-key');
+      // Coverage says exactly that: user areas ✗ with the reason, automatic areas ✓.
+      const covered = coverageOf(result.report);
+      const limit =
+        'not-tested: the limit of 4 AI calls for one run was reached. Run ShipCheck again with fewer parts at a time, for example --flows core.';
+      expect(covered.core).toBe(limit);
+      expect(covered.forms).toBe(limit);
+      expect(covered['phone-flows']).toMatch(/^not-tested: /);
+      for (const area of ['phone-layout', 'errors', 'links', 'seo', 'security', 'accessibility']) {
+        expect(covered[area], area).toBe('✓');
+      }
+      expect(result.report.verdict).not.toBe('ready');
     } finally {
       await app.close();
     }
@@ -426,6 +456,11 @@ describe('budgets', () => {
         ]),
       );
       expect(result.report.meta.partial).toBe(true);
+      const covered = coverageOf(result.report);
+      expect(covered['phone-flows']).toBe(
+        'not-tested: Landing page, Sign-up, Log-in, Main feature: ShipCheck reached its limit of 20 AI calls for one run. Run ShipCheck again with fewer parts at a time, for example --flows core.',
+      );
+      expect(covered['phone-layout']).toBe('✓');
       expect(rules(result.report)).toContain('mobile/sideways-scroll');
       expect(rules(result.report)).not.toContain('signup/button-does-nothing');
     } finally {
@@ -447,6 +482,10 @@ describe('budgets', () => {
       expect(result.report.notTested).toContain(
         'The phone-sized pass — left out with --skip-mobile',
       );
+      const covered = coverageOf(result.report);
+      expect(covered['phone-flows']).toBe('skipped: you used --skip-mobile');
+      expect(covered['phone-layout']).toBe('skipped: you used --skip-mobile');
+      expect(covered.signup).toBe('✓');
     } finally {
       await app.close();
     }
@@ -465,6 +504,37 @@ describe('budgets', () => {
       expect(result.report.notTested.join('\n')).toMatch(
         /Landing page, Signing up, Logging in, Main feature — left out with --flows/,
       );
+      const covered = coverageOf(result.report);
+      expect([covered.signup, covered.login, covered.core]).toEqual([
+        'skipped: you used --flows',
+        'skipped: you used --flows',
+        'skipped: you used --flows',
+      ]);
+      expect(covered.forms).toBe('✓');
+      expect(covered['phone-flows']).toBe('skipped: you used --flows');
+      // Problems were found, so the verdict says so; it is the skipped areas are the user's choice.
+      expect(result.report.verdict).not.toBe('ready');
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe('an app without sign-up and log-in', () => {
+  it('“Not in your app” on desktop also holds on the phone: nothing is marked “Not tested” for it', async () => {
+    const app = await startFixtureServer();
+    try {
+      const result = await runShipCheck(
+        loadConfig(app.url, { yes: true, flows: 'landing,signup,login' }, {}),
+        {},
+        { aiDriver: (budget) => createScriptedDriver({ budget, noAccounts: true }) },
+      );
+      const covered = coverageOf(result.report);
+      expect(covered.signup).toBe('absent: ShipCheck found no sign-up page');
+      expect(covered.login).toBe('absent: ShipCheck found no log-in page');
+      expect(covered['phone-flows']).not.toMatch(/^not-tested/);
+      // Nothing about accounts keeps this run from "Ready to launch".
+      expect(result.report.coverage.filter(isUntested)).toEqual([]);
     } finally {
       await app.close();
     }

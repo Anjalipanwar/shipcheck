@@ -14,13 +14,28 @@ exports[`HTML structure snapshot > matches the stored structure of a report that
 </dl>
 </div></header>
 <main id="main" class="wrap">
-<section class="verdict v-not-ready" aria-labelledby="verdict-title">
+<section class="verdict v-checks-found-issues t-blocker" aria-labelledby="verdict-title">
 <h2 id="verdict-title">Verdict</h2>
-<p class="big">Not ready</p>
-<p>At least one problem would stop a new user or put your accounts at risk. Fix the blockers before you launch.</p>
+<p class="big">Automatic checks found issues</p>
+<p>At least one is a blocker: fix it before you launch. ShipCheck did not use your app like a visitor, so a full check may find more.</p>
 <ul class="counts" aria-label="Issues by severity"><li><span class="badge sev-blocker" title="Blocker: a new user cannot get through, or a secret is exposed">1 Blocker</span></li><li><span class="badge sev-major" title="Major: it works, but is broken or confusing for many users">1 Major</span></li><li><span class="badge sev-minor" title="Minor: polish and edge cases">1 Minor</span></li><li><span class="badge sev-info" title="Info: good to know, not a bug">1 Info</span></li></ul>
+<p class="legend">Blocker = stops people using your app · Major = breaks or confuses many people · Minor = polish</p>
 </section>
-<p class="caveat"><strong>Note:</strong> This verdict is based on the automatic checks only. Signing up, logging in, the main feature and forms were not tested (on desktop or on a phone), because this run used no AI key. The phone layout was checked.</p>
+<section class="coverage" aria-labelledby="coverage-title">
+<h2 id="coverage-title">What this report covers</h2>
+<p class="check-type">Automatic checks only (no AI)</p>
+<p>ShipCheck loaded your pages and checked them from the outside: hidden errors, broken links, phone screen layout, SEO and basic security. It did not sign up, log in or use any feature.</p>
+<table class="cov">
+<caption class="sr-only">What happened in each area</caption>
+<thead class="sr-only"><tr><th scope="col">Area</th><th scope="col">Result</th></tr></thead>
+<tbody><tr class="group"><th colspan="2" scope="colgroup">Using your app like a visitor (full check only)</th></tr><tr class="st-not-tested"><th scope="row">Sign-up</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr><tr class="st-problems s-major"><th scope="row">Log-in</th><td><span class="icon" aria-hidden="true">⚠</span> <span class="state"><a href="#issue-2">1 problem</a></span><span class="why">Only partly tested: this needs the full check</span></td></tr><tr class="st-not-tested"><th scope="row">Main feature</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr><tr class="st-not-tested"><th scope="row">Forms (including wrong or missing input)</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr><tr class="st-not-tested"><th scope="row">Using it on a phone</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr></tbody>
+<tbody><tr class="group"><th colspan="2" scope="colgroup">Automatic checks (always run)</th></tr><tr class="st-no-problems"><th scope="row">Phone screen layout</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Hidden errors</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Broken links</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-problems s-minor"><th scope="row">SEO</th><td><span class="icon" aria-hidden="true">⚠</span> <span class="state"><a href="#issue-3">1 problem</a></span></td></tr><tr class="st-problems s-blocker"><th scope="row">Basic security</th><td><span class="icon" aria-hidden="true">⚠</span> <span class="state"><a href="#issue-1">1 problem</a></span></td></tr><tr class="st-no-problems"><th scope="row">Accessibility</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr></tbody>
+</table>
+<p class="why-differ">Automatic checks can’t find problems that only appear when someone uses the app, such as a sign-up that fails or a button that does nothing. That’s why a full check often finds more than automatic checks.</p>
+<p><strong>Next step:</strong> Run the full check to test your app like a real visitor. You need a free AI key.</p>
+<pre class="cmd"><code>npx @anjalipanwar/shipcheck https://myapp.example.com/</code></pre>
+<p><a href="https://github.com/Anjalipanwar/shipcheck#get-a-free-ai-key" rel="noopener noreferrer">How to get a free AI key</a></p>
+</section>
 <section aria-labelledby="first-title">
 <h2 id="first-title">Fix these first</h2>
 <div class="panel"><ol class="first"><li><span class="badge sev-blocker">Blocker</span><a href="#issue-1">A secret key is visible to anyone who visits your app</a></li><li><span class="badge sev-major">Major</span><a href="#issue-2">Login shows no message when the password is wrong</a></li><li><span class="badge sev-minor">Minor</span><a href="#issue-3">Your home page has no description for search results</a></li></ol></div>

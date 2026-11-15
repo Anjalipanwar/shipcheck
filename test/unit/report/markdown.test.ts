@@ -34,6 +34,7 @@ describe('renderMarkdown', () => {
   it('has the same sections in the same order as the HTML report', () => {
     expect(markdown.split('\n').filter((line) => /^##? /.test(line))).toEqual([
       '# ShipCheck pre-launch report',
+      '## What this report covers',
       '## Fix these first',
       '## All issues (4)',
       '## What worked',
@@ -46,9 +47,11 @@ describe('renderMarkdown', () => {
     ]);
   });
 
-  it('states the verdict, counts, caveat and run details', () => {
-    expect(markdown).toContain('**Verdict: Not ready** — 1 blocker · 1 major · 1 minor · 1 info');
-    expect(markdown).toContain('> **Note:** This verdict is based on the automatic checks only.');
+  it('states the verdict, counts and run details; a neutral verdict still names a blocker', () => {
+    expect(markdown).toContain(
+      '**Verdict: Automatic checks found issues** — 1 Blocker · 1 Major · 1 Minor · 1 Info',
+    );
+    expect(markdown).toContain('At least one is a blocker: fix it before you launch.');
     expect(markdown).toContain('- **Date:** 13 November 2026, 17:57 UTC');
   });
 
@@ -63,7 +66,8 @@ describe('renderMarkdown', () => {
 
   it('handles an empty report', () => {
     const empty = renderMarkdown(makeReport([], { passed: [], notTested: [] }));
-    expect(empty).toContain('**Verdict: Ready to launch**');
+    expect(empty).toContain('**Verdict: Automatic checks passed — app not tested as a user**');
+    expect(empty).not.toContain('Ready to launch');
     expect(empty).toContain('No issues found.');
     expect(empty).toContain('Nothing — every planned check ran.');
   });
@@ -72,11 +76,15 @@ describe('renderMarkdown', () => {
 describe('renderStepSummary', () => {
   it('shows the verdict and one table row per issue', () => {
     const summary = renderStepSummary(sampleReport().report);
-    expect(summary).toContain('**Verdict: Not ready**');
+    expect(summary).toContain('**Verdict: Automatic checks found issues**');
     expect(summary).toContain(
       '| Blocker | A secret key is visible to anyone who visits your app | Security | Desktop and phone |',
     );
-    expect(summary.split('\n').filter((line) => line.startsWith('| ')).length).toBe(2 + 4);
+    const issueRows = summary
+      .split('\n')
+      .filter((line) => /^\| (Severity|Blocker|Major|Minor|Info) \|/.test(line));
+    expect(issueRows.length).toBe(1 + 4); // header + one row per issue
+    expect(summary).toContain('### What this report covers');
     expect(summary).toContain('**What we couldn’t test**');
   });
 

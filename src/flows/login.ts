@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { PROMPTS } from '../ai/prompts.js';
+import { ADVICE } from '../report/present.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
 import { click, fill, first, readFields, type Field } from './fields.js';
 
@@ -40,6 +41,11 @@ export const loginFlow: FlowBody = async (ctx) => {
   if (!form) {
     ctx.skip(
       'Logging in — no log-in form with email and password was found. If the app only offers “Sign in with Google” or similar, ShipCheck cannot test it in this version',
+      // No log-in link and no form on a desktop screen: the app has no log-in. On a phone the
+      // link may just sit behind a menu, so that is "not tested", never "not in your app".
+      !entry && ctx.device === 'desktop'
+        ? { kind: 'absent', reason: 'ShipCheck found no log-in page' }
+        : { reason: 'no log-in form with email and password was found', action: ADVICE.byHand },
     );
     return;
   }
@@ -160,6 +166,7 @@ export const loginFlow: FlowBody = async (ctx) => {
   if (!account) {
     ctx.skip(
       'Logging in with a correct password — ShipCheck has no test account (signing up did not finish). Give it one with --email and --password',
+      { reason: 'ShipCheck had no account to log in with', action: ADVICE.account },
     );
     return;
   }

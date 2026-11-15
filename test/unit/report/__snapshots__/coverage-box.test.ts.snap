@@ -1,0 +1,100 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the box in report.html > snapshot: automatic checks only 1`] = `
+"<section class="coverage" aria-labelledby="coverage-title">
+<h2 id="coverage-title">What this report covers</h2>
+<p class="check-type">Automatic checks only (no AI)</p>
+<p>ShipCheck loaded your pages and checked them from the outside: hidden errors, broken links, phone screen layout, SEO and basic security. It did not sign up, log in or use any feature.</p>
+<table class="cov">
+<caption class="sr-only">What happened in each area</caption>
+<thead class="sr-only"><tr><th scope="col">Area</th><th scope="col">Result</th></tr></thead>
+<tbody><tr class="group"><th colspan="2" scope="colgroup">Using your app like a visitor (full check only)</th></tr><tr class="st-not-tested"><th scope="row">Sign-up</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr><tr class="st-not-tested"><th scope="row">Log-in</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr><tr class="st-not-tested"><th scope="row">Main feature</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr><tr class="st-not-tested"><th scope="row">Forms (including wrong or missing input)</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr><tr class="st-not-tested"><th scope="row">Using it on a phone</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: this needs the full check</span></td></tr></tbody>
+<tbody><tr class="group"><th colspan="2" scope="colgroup">Automatic checks (always run)</th></tr><tr class="st-no-problems"><th scope="row">Phone screen layout</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Hidden errors</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Broken links</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-problems s-minor"><th scope="row">SEO</th><td><span class="icon" aria-hidden="true">⚠</span> <span class="state">1 problem</span></td></tr><tr class="st-no-problems"><th scope="row">Basic security</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Accessibility</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr></tbody>
+</table>
+<p class="why-differ">Automatic checks can’t find problems that only appear when someone uses the app, such as a sign-up that fails or a button that does nothing. That’s why a full check often finds more than automatic checks.</p>
+<p><strong>Next step:</strong> Run the full check to test your app like a real visitor. You need a free AI key.</p>
+<pre class="cmd"><code>npx @anjalipanwar/shipcheck https://myapp.example.com/</code></pre>
+<p><a href="https://github.com/Anjalipanwar/shipcheck#get-a-free-ai-key" rel="noopener noreferrer">How to get a free AI key</a></p>
+</section>"
+`;
+
+exports[`the box in report.html > snapshot: full check that stopped early 1`] = `
+"<section class="coverage" aria-labelledby="coverage-title">
+<h2 id="coverage-title">What this report covers</h2>
+<p class="check-type">Full check (AI)</p>
+<p>ShipCheck tried to use your app like a new visitor: signing up, logging in, using the main feature and filling in forms, on desktop and on a phone. It also ran the automatic checks. The list shows how far it got.</p>
+<table class="cov">
+<caption class="sr-only">What happened in each area</caption>
+<thead class="sr-only"><tr><th scope="col">Area</th><th scope="col">Result</th></tr></thead>
+<tbody><tr class="group"><th colspan="2" scope="colgroup">Using your app like a visitor (full check only)</th></tr><tr class="st-no-problems"><th scope="row">Sign-up</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-not-tested"><th scope="row">Log-in</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: ShipCheck has no test account (signing up did not finish). Add a test account (see the README).</span></td></tr><tr class="st-not-tested"><th scope="row">Main feature</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: your AI key’s quota ran out. Try again tomorrow, or use a paid key.</span></td></tr><tr class="st-no-problems"><th scope="row">Forms (including wrong or missing input)</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-not-tested"><th scope="row">Using it on a phone</th><td><span class="icon" aria-hidden="true">○</span> <span class="state">Not tested: Log-in: no log-in form was found. Check this part by hand.</span></td></tr></tbody>
+<tbody><tr class="group"><th colspan="2" scope="colgroup">Automatic checks (always run)</th></tr><tr class="st-no-problems"><th scope="row">Phone screen layout</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Hidden errors</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Broken links</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-problems s-minor"><th scope="row">SEO</th><td><span class="icon" aria-hidden="true">⚠</span> <span class="state">1 problem</span></td></tr><tr class="st-no-problems"><th scope="row">Basic security</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr><tr class="st-no-problems"><th scope="row">Accessibility</th><td><span class="icon" aria-hidden="true">✓</span> <span class="state">No problems found</span></td></tr></tbody>
+</table>
+<p><strong>Please note:</strong> This is not a guarantee that your app is free of bugs. Anything ShipCheck could not test is listed under “What we couldn’t test”.</p>
+</section>"
+`;
+
+exports[`the box in report.md, the step summary and the terminal > snapshot: Markdown, both modes 1`] = `
+"## What this report covers
+
+**Automatic checks only (no AI)** — ShipCheck loaded your pages and checked them from the outside: hidden errors, broken links, phone screen layout, SEO and basic security. It did not sign up, log in or use any feature.
+
+**Using your app like a visitor (full check only)**
+
+| Area | Result |
+| --- | --- |
+| Sign-up | ○ Not tested: this needs the full check |
+| Log-in | ○ Not tested: this needs the full check |
+| Main feature | ○ Not tested: this needs the full check |
+| Forms (including wrong or missing input) | ○ Not tested: this needs the full check |
+| Using it on a phone | ○ Not tested: this needs the full check |
+
+**Automatic checks (always run)**
+
+| Area | Result |
+| --- | --- |
+| Phone screen layout | ✓ No problems found |
+| Hidden errors | ✓ No problems found |
+| Broken links | ✓ No problems found |
+| SEO | ⚠ 1 problem (worst: Minor) |
+| Basic security | ✓ No problems found |
+| Accessibility | ✓ No problems found |
+
+Automatic checks can’t find problems that only appear when someone uses the app, such as a sign-up that fails or a button that does nothing. That’s why a full check often finds more than automatic checks.
+
+**Next step:** Run the full check to test your app like a real visitor. You need a free AI key.
+
+\`\`\`text
+npx @anjalipanwar/shipcheck https://myapp.example.com/
+\`\`\`
+
+[How to get a free AI key](https://github.com/Anjalipanwar/shipcheck#get-a-free-ai-key)"
+`;
+
+exports[`the box in report.md, the step summary and the terminal > snapshot: Markdown, both modes 2`] = `
+"## What this report covers
+
+**Full check (AI)** — ShipCheck tried to use your app like a new visitor: signing up, logging in, using the main feature and filling in forms, on desktop and on a phone. It also ran the automatic checks. The list shows how far it got.
+
+**Using your app like a visitor (full check only)**
+
+| Area | Result |
+| --- | --- |
+| Sign-up | ✓ No problems found |
+| Log-in | ○ Not tested: ShipCheck has no test account (signing up did not finish). Add a test account (see the README). |
+| Main feature | ○ Not tested: your AI key’s quota ran out. Try again tomorrow, or use a paid key. |
+| Forms (including wrong or missing input) | ✓ No problems found |
+| Using it on a phone | ○ Not tested: Log-in: no log-in form was found. Check this part by hand. |
+
+**Automatic checks (always run)**
+
+| Area | Result |
+| --- | --- |
+| Phone screen layout | ✓ No problems found |
+| Hidden errors | ✓ No problems found |
+| Broken links | ✓ No problems found |
+| SEO | ⚠ 1 problem (worst: Minor) |
+| Basic security | ✓ No problems found |
+| Accessibility | ✓ No problems found |
+
+**Please note:** This is not a guarantee that your app is free of bugs. Anything ShipCheck could not test is listed under “What we couldn’t test”."
+`;

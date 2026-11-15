@@ -6,15 +6,17 @@ import {
   NOT_CHECKED,
   SEVERITY_LABEL,
   VERDICT_LABEL,
-  VERDICT_SUMMARY,
   countsLine,
+  SEVERITY_LEGEND,
   formatDate,
   formatDuration,
   groupFindings,
   groupOf,
   modelLine,
-  runCaveats,
+  nothingUrgentText,
+  verdictSummary,
 } from './present.js';
+import { coverageView } from './coverage-view.js';
 import type { Finding, Report } from './schema.js';
 import { topIssues } from './verdict.js';
 
@@ -45,8 +47,9 @@ function summaryLines(report: Report): string[] {
   return [
     `**Verdict: ${VERDICT_LABEL[report.verdict]}** — ${countsLine(report.counts)}`,
     '',
-    VERDICT_SUMMARY[report.verdict],
-    ...runCaveats(report).flatMap((caveat) => ['', `> **Note:** ${caveat}`]),
+    SEVERITY_LEGEND,
+    '',
+    verdictSummary(report),
     '',
     `- **App:** ${m(meta.url)}`,
     `- **Date:** ${formatDate(meta.startedAt)}`,
@@ -54,6 +57,28 @@ function summaryLines(report: Report): string[] {
     `- **AI model:** ${m(modelLine(meta))}`,
     `- **ShipCheck version:** ${m(meta.shipcheckVersion)}`,
   ];
+}
+
+/** "What this report covers": the same words as the HTML box (owner decisions 2026-11-15). */
+export function coverageMarkdown(report: Report, heading: string): string[] {
+  const view = coverageView(report);
+  const lines = [`${heading} ${view.title}`, '', `**${view.checkType}** — ${view.did}`, ''];
+  for (const group of view.groups) {
+    lines.push(`**${group.heading}**`, '', '| Area | Result |', '| --- | --- |');
+    for (const row of group.rows) {
+      const worst = row.worst ? ` (worst: ${SEVERITY_LABEL[row.worst]})` : '';
+      const partial = row.partial ? ` — ${row.partial}` : '';
+      lines.push(`| ${row.label} | ${row.icon} ${m(`${row.text}${worst}${partial}`)} |`);
+    }
+    lines.push('');
+  }
+  if (view.other) lines.push(`⚠ ${view.other}`, '');
+  if (view.whyDiffer) lines.push(view.whyDiffer, '');
+  lines.push(`**${view.nextLabel}** ${view.next}`);
+  if (view.command) {
+    lines.push('', codeBlock(view.command), '', `[${view.help.text}](${view.help.url})`);
+  }
+  return lines;
 }
 
 function issue(finding: Finding): string[] {
@@ -98,11 +123,18 @@ function bullets(lines: readonly string[], empty: string): string[] {
 /** report.md: the same content and order as report.html, readable as plain text. */
 export function renderMarkdown(report: Report): string {
   const top = topIssues(report.findings);
-  const lines = ['# ShipCheck pre-launch report', '', ...summaryLines(report), ''];
+  const lines = [
+    '# ShipCheck pre-launch report',
+    '',
+    ...summaryLines(report),
+    '',
+    ...coverageMarkdown(report, '##'),
+    '',
+  ];
 
   lines.push('## Fix these first', '');
   if (top.length === 0) {
-    lines.push('Nothing urgent. ShipCheck found no problems that need fixing before launch.');
+    lines.push(nothingUrgentText(report));
   } else {
     top.forEach((finding, index) =>
       lines.push(`${index + 1}. **${SEVERITY_LABEL[finding.severity]}** — ${m(finding.title)}`),
@@ -129,7 +161,14 @@ export function renderMarkdown(report: Report): string {
 
 /** Short version for the GitHub Actions run page (SPEC §5.2): verdict plus an issue table. */
 export function renderStepSummary(report: Report): string {
-  const lines = ['## ShipCheck report', '', ...summaryLines(report), ''];
+  const lines = [
+    '## ShipCheck report',
+    '',
+    ...summaryLines(report),
+    '',
+    ...coverageMarkdown(report, '###'),
+    '',
+  ];
   if (report.findings.length === 0) {
     lines.push('No issues found.');
   } else {

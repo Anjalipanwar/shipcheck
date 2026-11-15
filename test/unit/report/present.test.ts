@@ -6,7 +6,6 @@ import {
   groupFindings,
   groupOf,
   modelLine,
-  runCaveats,
 } from '../../../src/report/present.js';
 import { topIssues } from '../../../src/report/verdict.js';
 import { finding, makeReport } from './fixtures.js';
@@ -89,7 +88,7 @@ describe('wording helpers', () => {
 
   it('writes the counts line and the model line', () => {
     expect(countsLine({ blocker: 1, major: 0, minor: 5, info: 1 })).toBe(
-      '1 blocker · 0 major · 5 minor · 1 info',
+      '1 Blocker · 0 Major · 5 Minor · 1 Info',
     );
     const meta = makeReport().meta;
     expect(modelLine(meta)).toBe('None — automatic checks only');
@@ -99,15 +98,5 @@ describe('wording helpers', () => {
     expect(modelLine({ ...meta, mode: 'full', model: 'gemini-x', llmCalls: 42 })).toBe(
       'gemini-x (42 AI calls)',
     );
-  });
-
-  it('adds honest caveats for runs without AI and for runs that stopped early', () => {
-    const report = makeReport();
-    expect(runCaveats(report)).toHaveLength(1);
-    expect(runCaveats(report)[0]).toMatch(/automatic checks only/);
-    const full = { ...report, meta: { ...report.meta, mode: 'full' as const } };
-    expect(runCaveats(full)).toEqual([]);
-    const partial = { ...full, meta: { ...full.meta, partial: true } };
-    expect(runCaveats(partial)[0]).toMatch(/stopped early/);
   });
 });

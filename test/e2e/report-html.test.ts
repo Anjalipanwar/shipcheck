@@ -92,12 +92,30 @@ describe('report.html from a real run', () => {
     expect(requests.filter((url) => !url.startsWith('data:'))).toEqual([
       pathToFileURL(written.htmlPath).href,
     ]);
-    await expect(page.title()).resolves.toMatch(/^ShipCheck report — Not ready — 127\.0\.0\.1/);
+    await expect(page.title()).resolves.toMatch(
+      /^ShipCheck report — Automatic checks found issues — 127\.0\.0\.1/,
+    );
   });
 
   it('shows the verdict, the counts and the nine findings of the fixture app (no-AI run, phone layout included)', async () => {
     const page = await open(DESKTOP);
-    expect(await page.locator('.verdict .big').innerText()).toBe('Not ready');
+    expect(await page.locator('.verdict .big').innerText()).toBe('Automatic checks found issues');
+    // The coverage box is right under the verdict, open, and readable without hovering.
+    const box = page.locator('.verdict + .coverage');
+    expect(await box.isVisible()).toBe(true);
+    expect(await box.locator('.check-type').innerText()).toBe('Automatic checks only (no AI)');
+    expect(await box.locator('tr.st-not-tested td').first().innerText()).toBe(
+      '○ Not tested: this needs the full check',
+    );
+    expect(await box.locator('tbody tr:not(.group)').count()).toBe(11);
+    expect(await box.locator('tr.group').allInnerTexts()).toEqual([
+      'Using your app like a visitor (full check only)',
+      'Automatic checks (always run)',
+    ]);
+    // A row with problems links to its worst finding.
+    const target = await box.locator('tr.st-problems a').first().getAttribute('href');
+    expect(await page.locator(`${target ?? '#none'}`).count()).toBe(1);
+    expect(await page.locator('.verdict .legend').innerText()).toContain('Blocker = stops people');
     expect(await page.locator('.counts li').allInnerTexts()).toEqual([
       '1 Blocker',
       '1 Major',
@@ -118,7 +136,7 @@ describe('report.html from a real run', () => {
       'HIDDEN ERRORS',
     ]);
     expect(await page.locator('ul.worked li').count()).toBeGreaterThanOrEqual(10);
-    expect(await page.locator('ul.skipped').innerText()).toMatch(/need an AI key/);
+    expect(await page.locator('ul.skipped').innerText()).toMatch(/need the full check/);
   });
 
   it('"fix these first" jumps to the matching issue card', async () => {

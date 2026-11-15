@@ -45,6 +45,7 @@ Estimated total: ~2 focused days. Times are rough guides, not limits.
 
 ## M6 — AI judge, fix prompts, dedupe (≈2h)
 - `ai/prompts.ts` + `ai/judge.ts`: observations → Findings in plain English with severity per SPEC definitions and a fix prompt per finding. Enforce: no evidence → no finding. Dedupe near-duplicates. Keep jargon out (add a test that rejects findings containing words like "DOM", "selector", "stack trace" in `title`).
+- **False-alarm fixture (owner decision 2026-11-15):** the real-app run reported two sign-up Blockers that were false alarms (the sign-up had worked; it was judged while the page was still loading, before the redirect). Build a fixture case that reproduces this — a sign-up that succeeds but shows a loading label first and redirects late, plus a tracking beacon (same-site POST answered 202) next to a form the page itself refuses — and a test that proves the M6 judge reports **no** finding for it.
 - **Done when:** full AI run on buggy-app meets SPEC §10 targets (≥ 7/10 planted bugs, 0 guard violations, 0 false secret flags) and the report reads like a clear bug report.
 
 ## M7 — CLI polish (≈1h)
@@ -62,11 +63,13 @@ Estimated total: ~2 focused days. Times are rough guides, not limits.
 - `examples/reports/buggy-app.html` + slots for 2 real-app reports (owner supplies apps they own/have permission for).
 - GitHub Pages project page (simple static `docs-site/` or Pages from `examples/`), with the sample report and quickstart.
 - Record a short demo GIF of a CLI run (or leave a clear TODO with exact steps for the owner).
+- **Every command and link shown in a report must work (owner decision 2026-11-15).** Checklist: the README has the section the report links to (`#get-a-free-ai-key`) and explains test accounts ("Add a test account (see the README)"); every flag named in a report's advice (`--flows`, `--max-minutes`, `--goal`, `--email`/`--password`) exists. Add a test that reads `README.md` and fails if a heading the report links to is missing, and one that checks each flag named in `ADVICE` against the CLI's options.
 - **Done when:** a non-technical person could follow the README quickstart in under 5 minutes.
 
 ## M10 — Release (≈1h, owner involved)
 - `npm pack` dry run, check package contents/size. Owner runs `npm login` + `npm publish --access public`.
 - Tag `v0.1.0` and move `v0` tag; GitHub release notes from CHANGELOG.
+- Re-check the M9 list after publishing: the full-check command printed in reports (`npx @anjalipanwar/shipcheck <url>`) runs from a clean machine, and the report's links open.
 - **Done when:** `npx @anjalipanwar/shipcheck --help` works from a clean machine.
 
 ---

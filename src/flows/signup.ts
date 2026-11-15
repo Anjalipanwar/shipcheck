@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROMPTS } from '../ai/prompts.js';
+import { ADVICE } from '../report/present.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
 import { click, fill, first, readFields } from './fields.js';
 
@@ -14,7 +15,10 @@ const OutcomeSchema = z.object({
 export const signupFlow: FlowBody = async (ctx) => {
   if (ctx.config.email && ctx.config.password) {
     ctx.shared.account = { email: ctx.config.email, password: ctx.config.password };
-    ctx.skip('Signing up — skipped, because you gave ShipCheck an existing test account');
+    ctx.skip('Signing up — skipped, because you gave ShipCheck an existing test account', {
+      kind: 'choice',
+      reason: 'you gave ShipCheck a test account',
+    });
     return;
   }
   await ctx.goto(ctx.homeUrl, 'Open the home page');
@@ -33,6 +37,10 @@ export const signupFlow: FlowBody = async (ctx) => {
   if (!password || !submit) {
     ctx.skip(
       'Signing up — no sign-up form with a password was found. If the app only offers “Sign in with Google” or similar, give ShipCheck a test account with --email and --password',
+      // No sign-up link and no form on a desktop screen: the app has no sign-up page.
+      !entry && ctx.device === 'desktop'
+        ? { kind: 'absent', reason: 'ShipCheck found no sign-up page' }
+        : { reason: 'no sign-up form with a password was found', action: ADVICE.account },
     );
     return;
   }
@@ -112,10 +120,12 @@ export const signupFlow: FlowBody = async (ctx) => {
   if (outcome.captchaBlocked) {
     ctx.skip(
       'Signing up — a CAPTCHA (“I am not a robot”) stopped the automatic test. Give ShipCheck a test account with --email and --password to test the rest',
+      { reason: 'a CAPTCHA (“I am not a robot”) stopped the test', action: ADVICE.account },
     );
   } else if (outcome.needsEmailVerification) {
     ctx.skip(
       'Signing up — the app asks to confirm the email address first, which ShipCheck cannot do. Give ShipCheck a confirmed test account with --email and --password',
+      { reason: 'your app asks new users to confirm their email first', action: ADVICE.account },
     );
   } else if (outcome.accountCreated) {
     ctx.shared.account = { email, password: identity.password };

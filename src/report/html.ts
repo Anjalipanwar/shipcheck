@@ -13,13 +13,17 @@ import {
   SEVERITY_LABEL,
   SEVERITY_MEANING,
   VERDICT_LABEL,
-  VERDICT_SUMMARY,
   formatDate,
   formatDuration,
   groupFindings,
   modelLine,
-  runCaveats,
+  nothingUrgentText,
+  verdictSummary,
+  severityCount,
+  SEVERITY_LEGEND,
+  verdictTone,
 } from './present.js';
+import { coverageView, type CoverageRow } from './coverage-view.js';
 import type { Finding, Report } from './schema.js';
 import { topIssues } from './verdict.js';
 
@@ -138,16 +142,66 @@ function header(report: Report): string {
 function verdictBanner(report: Report): string {
   const counts = SEVERITIES.map(
     (severity) =>
-      `<li><span class="badge sev-${severity}" title="${e(SEVERITY_LABEL[severity])}: ${e(SEVERITY_MEANING[severity])}">${report.counts[severity]} ${e(SEVERITY_LABEL[severity])}</span></li>`,
+      `<li><span class="badge sev-${severity}" title="${e(SEVERITY_LABEL[severity])}: ${e(SEVERITY_MEANING[severity])}">${e(severityCount(severity, report.counts[severity]))}</span></li>`,
   );
   return [
-    `<section class="verdict v-${report.verdict}" aria-labelledby="verdict-title">`,
+    `<section class="verdict v-${report.verdict} t-${verdictTone(report)}" aria-labelledby="verdict-title">`,
     '<h2 id="verdict-title">Verdict</h2>',
     `<p class="big">${e(VERDICT_LABEL[report.verdict])}</p>`,
-    `<p>${e(VERDICT_SUMMARY[report.verdict])}</p>`,
+    `<p>${e(verdictSummary(report))}</p>`,
     `<ul class="counts" aria-label="Issues by severity">${counts.join('')}</ul>`,
+    `<p class="legend">${e(SEVERITY_LEGEND)}</p>`,
     '</section>',
-    ...runCaveats(report).map((text) => `<p class="caveat"><strong>Note:</strong> ${e(text)}</p>`),
+  ].join('\n');
+}
+
+/**
+ * "What this report covers" (owner decisions 2026-11-15): always shown, right under the verdict,
+ * never collapsed. Each row is in one of four states; the words are visible text, never only a
+ * colour or a hover. A row with problems links to the first (worst) of them.
+ */
+export function coverageBox(report: Report, anchors: Map<Finding, string> = new Map()): string {
+  const view = coverageView(report);
+  const row = (item: CoverageRow): string => {
+    const anchor = item.findings.map((finding) => anchors.get(finding)).find(Boolean);
+    const text = anchor ? `<a href="#${anchor}">${e(item.text)}</a>` : e(item.text);
+    const tone = item.state === 'problems' ? ` s-${item.worst ?? 'minor'}` : '';
+    return [
+      `<tr class="st-${item.state}${tone}">`,
+      `<th scope="row">${e(item.label)}</th>`,
+      `<td><span class="icon" aria-hidden="true">${item.icon}</span> <span class="state">${text}</span>`,
+      item.partial ? `<span class="why">${e(item.partial)}</span>` : '',
+      '</td></tr>',
+    ].join('');
+  };
+  const groups = view.groups.map((group) =>
+    [
+      `<tbody><tr class="group"><th colspan="2" scope="colgroup">${e(group.heading)}</th></tr>`,
+      ...group.rows.map(row),
+      '</tbody>',
+    ].join(''),
+  );
+  const next = view.command
+    ? [
+        `<p><strong>${e(view.nextLabel)}</strong> ${e(view.next)}</p>`,
+        `<pre class="cmd"><code>${e(view.command)}</code></pre>`,
+        `<p><a href="${e(view.help.url)}" rel="noopener noreferrer">${e(view.help.text)}</a></p>`,
+      ]
+    : [`<p><strong>${e(view.nextLabel)}</strong> ${e(view.next)}</p>`];
+  return [
+    '<section class="coverage" aria-labelledby="coverage-title">',
+    `<h2 id="coverage-title">${e(view.title)}</h2>`,
+    `<p class="check-type">${e(view.checkType)}</p>`,
+    `<p>${e(view.did)}</p>`,
+    '<table class="cov">',
+    `<caption class="sr-only">${e(view.tableCaption)}</caption>`,
+    '<thead class="sr-only"><tr><th scope="col">Area</th><th scope="col">Result</th></tr></thead>',
+    ...groups,
+    '</table>',
+    ...(view.other ? [`<p class="other">⚠ ${e(view.other)}</p>`] : []),
+    ...(view.whyDiffer ? [`<p class="why-differ">${e(view.whyDiffer)}</p>`] : []),
+    ...next,
+    '</section>',
   ].join('\n');
 }
 
@@ -162,11 +216,11 @@ function firstLook(gallery: Gallery, images: readonly ReportImage[]): string {
   ].join('\n');
 }
 
-function fixFirst(findings: readonly Finding[], anchors: Map<Finding, string>): string {
-  const top = topIssues(findings);
+function fixFirst(report: Report, anchors: Map<Finding, string>): string {
+  const top = topIssues(report.findings);
   const body =
     top.length === 0
-      ? '<p>Nothing urgent. ShipCheck found no problems that need fixing before launch.</p>'
+      ? `<p>${e(nothingUrgentText(report))}</p>`
       : `<ol class="first">${top
           .map(
             (finding) =>
@@ -293,7 +347,8 @@ export function renderBody(
     header(report),
     '<main id="main" class="wrap">',
     verdictBanner(report),
-    fixFirst(report.findings, anchors),
+    coverageBox(report, anchors),
+    fixFirst(report, anchors),
     look,
     issues,
     listSection(

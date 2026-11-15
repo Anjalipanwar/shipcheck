@@ -42,6 +42,20 @@ export interface Observation {
   confidence: Finding['confidence'];
 }
 
+/**
+ * Something a flow did not test, for the "What this report covers" table:
+ * - blocked: something stopped the test (email confirmation, CAPTCHA, a limit, the guard…).
+ * - choice: the user left it out (e.g. gave a test account, so sign-up is skipped).
+ * - absent: the app has no such part (e.g. no sign-up page).
+ */
+export interface Gap {
+  kind: 'blocked' | 'choice' | 'absent';
+  /** Short reason in plain words. */
+  reason: string;
+  /** blocked only: what the user can do about it. */
+  action?: string;
+}
+
 export type FlowStatus = 'completed' | 'stopped' | 'skipped' | 'failed';
 
 export interface FlowResult {
@@ -50,6 +64,8 @@ export interface FlowResult {
   observations: Observation[];
   /** Lines for "What we couldn't test". */
   notTested: string[];
+  /** The same gaps in structured form, one per line above. */
+  gaps: Gap[];
   steps: number;
 }
 

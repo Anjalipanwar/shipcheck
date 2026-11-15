@@ -10,8 +10,11 @@ import {
   type FlowDeps,
   type FlowName,
   type FlowResult,
+  type Gap,
   type Observation,
 } from './types.js';
+import { reasonOf } from '../coverage.js';
+import { ADVICE } from '../report/present.js';
 
 const SETTLE_MS = 3000;
 const QUIET_MS = 350;
@@ -68,6 +71,7 @@ export function newIdentity(): { email: string; password: string; name: string }
 export class FlowContext {
   readonly observations: Observation[] = [];
   readonly notTested: string[] = [];
+  private readonly gaps: Gap[] = [];
   steps = 0;
 
   constructor(
@@ -191,8 +195,13 @@ export class FlowContext {
     const facts = await readElementFacts(this.page, action.selector);
     const verdict =
       this.deps.guardEnabled === false ? { allowed: true as const } : judgeAction(action, facts);
-    const secret = facts?.type === 'password';
+    const secret =
+      facts?.type === 'password' ||
+      /pass(word|wort|phrase)|kennwort/i.test(`${facts?.name ?? ''} ${facts?.label ?? ''}`);
     const value = action.arguments?.[0];
+    // Whatever is typed into a password field — also a password the AI made up by itself — is
+    // scrubbed from every output (SPEC §7.6), including text written before this point.
+    if (secret) this.evidence.protect(value);
     const logged = {
       device: this.deps.device,
       flow: this.flow,
@@ -330,8 +339,17 @@ export class FlowContext {
     this.observations.push({ flow: this.flow, ...observation });
   }
 
-  /** Adds a line for "What we couldn't test". On the phone, "Signing up — …" gets "on a phone". */
-  skip(line: string): void {
+  /**
+   * Adds a line for "What we couldn't test". On the phone, "Signing up — …" gets "on a phone".
+   * `gap` says what kind of gap it is (default: something blocked the test) and, for a blocked
+   * test, what the user can do; `reason` replaces the reason taken from the line.
+   */
+  skip(line: string, gap: Partial<Gap> = {}): void {
+    this.gaps.push({
+      kind: gap.kind ?? 'blocked',
+      reason: gap.reason ?? reasonOf(line),
+      ...(gap.action ? { action: gap.action } : {}),
+    });
     this.notTested.push(
       this.deps.device === 'mobile' && !/^[^—]* on a phone — /.test(line)
         ? line.replace(/^([^—]+?) — /, '$1 on a phone — ')
@@ -345,10 +363,20 @@ export class FlowContext {
       status,
       observations: this.observations,
       notTested: this.notTested,
+      gaps: this.gaps,
       steps: this.steps,
     };
   }
 }
+
+/** What the user can do when a flow was stopped on purpose. */
+const STOP_ADVICE: Record<StopFlow['reason'], (note: string) => string> = {
+  payment: () => ADVICE.payment,
+  budget: (note) => (note.includes('AI calls') ? ADVICE.calls : ADVICE.time),
+  steps: () => ADVICE.byHand,
+  'blocked-request': () => ADVICE.byHand,
+  quota: () => ADVICE.quota,
+};
 
 export type FlowBody = (ctx: FlowContext) => Promise<void>;
 
@@ -369,10 +397,10 @@ export async function runFlow(name: FlowName, deps: FlowDeps, body: FlowBody): P
   } catch (error) {
     await ctx.shot('stopped').catch(() => undefined);
     if (error instanceof StopFlow) {
-      ctx.skip(error.note);
+      ctx.skip(error.note, { action: STOP_ADVICE[error.reason](error.note) });
       return ctx.result('stopped');
     }
-    ctx.skip(`${ctx.label} — this part of the test could not finish`);
+    ctx.skip(`${ctx.label} — this part of the test could not finish`, { action: ADVICE.retry });
     if (process.env.SHIPCHECK_DEBUG) console.error(error);
     return ctx.result('failed');
   } finally {

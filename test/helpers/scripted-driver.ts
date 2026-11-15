@@ -28,6 +28,8 @@ export interface ScriptedOptions {
   budget?: LlmBudget;
   /** Replaces the answers for the main-feature steps (to script a misbehaving AI). */
   nextStep?: (page: Page, done: number) => ProposedAction[];
+  /** Pretends the app has no sign-up and no log-in: the AI finds neither a link nor a form. */
+  noAccounts?: boolean;
   /** Replaces the answer for "what is this app's main action". */
   goal?: string;
 }
@@ -46,6 +48,19 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
     async observe(page, instruction) {
       await options.budget?.run(async () => undefined);
       observed.push(instruction);
+      if (
+        options.noAccounts &&
+        (
+          [
+            PROMPTS.signupEntry,
+            PROMPTS.signupForm,
+            PROMPTS.loginEntry,
+            PROMPTS.loginForm,
+          ] as string[]
+        ).includes(instruction)
+      ) {
+        return [];
+      }
       switch (instruction) {
         case PROMPTS.landingTargets:
           return [

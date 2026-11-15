@@ -1,6 +1,11 @@
+import { CoverageRecorder, type Outcome } from '../../../src/coverage.js';
 import type { ReportImage } from '../../../src/report/html.js';
+import { NEEDS_FULL_CHECK } from '../../../src/report/present.js';
 import {
+  CoverageAreaSchema,
   makeFinding,
+  type CoverageArea,
+  type CoverageEntry,
   type Finding,
   type FindingInput,
   type Report,
@@ -23,26 +28,54 @@ export const baseFinding: FindingInput = {
 export const finding = (overrides: Partial<FindingInput> = {}): Finding =>
   makeFinding({ ...baseFinding, ...overrides });
 
+const USER_AREAS: readonly CoverageArea[] = ['signup', 'login', 'core', 'forms', 'phone-flows'];
+
+/**
+ * Coverage as a run of that kind produces it (built by the real recorder): automatic-only runs
+ * leave the visitor areas untested. `marks` overrides areas: a string is a "not tested" reason.
+ */
+export function coverageFor(
+  mode: Report['meta']['mode'],
+  marks: Partial<Record<CoverageArea, string | Outcome>> = {},
+  findings: readonly Finding[] = [],
+): CoverageEntry[] {
+  const recorder = new CoverageRecorder();
+  for (const area of CoverageAreaSchema.options) {
+    const mark = marks[area];
+    if (mark !== undefined) {
+      recorder.mark(area, typeof mark === 'string' ? { state: 'not-tested', note: mark } : mark);
+    } else if (!(mode === 'no-ai' && USER_AREAS.includes(area))) {
+      recorder.mark(area, { state: 'tested' });
+    }
+  }
+  return recorder.build(findings, () => ({ state: 'not-tested', note: NEEDS_FULL_CHECK }));
+}
+
+/** A valid report; the verdict follows the findings, mode and coverage unless overridden. */
 export function makeReport(findings: Finding[] = [], overrides: Partial<Report> = {}): Report {
   const ranked = rankFindings(findings);
+  const meta: Report['meta'] = {
+    url: 'https://myapp.example.com/',
+    startedAt: '2026-11-13T17:57:51.039Z',
+    durationMs: 2075,
+    model: null,
+    shipcheckVersion: '0.1.0',
+    mode: 'no-ai',
+    partial: false,
+    llmCalls: 0,
+    ...overrides.meta,
+  };
+  const coverage = overrides.coverage ?? coverageFor(meta.mode, {}, ranked);
   return {
-    meta: {
-      url: 'https://myapp.example.com/',
-      startedAt: '2026-11-13T17:57:51.039Z',
-      durationMs: 2075,
-      model: null,
-      shipcheckVersion: '0.1.0',
-      mode: 'no-ai',
-      partial: false,
-      llmCalls: 0,
-    },
-    verdict: computeVerdict(ranked),
+    verdict: computeVerdict(ranked, { mode: meta.mode, coverage }),
     counts: countBySeverity(ranked),
     findings: ranked,
     passed: ['Home page opens'],
     notTested: ['Signing up — needs an AI key'],
     actionLog: [],
     ...overrides,
+    meta,
+    coverage,
   };
 }
 

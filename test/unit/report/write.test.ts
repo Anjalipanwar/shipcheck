@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeFinding, type Report } from '../../../src/report/schema.js';
 import { redactDeep, writeReport } from '../../../src/report/write.js';
+import { coverageFor } from './fixtures.js';
 
 let dir: string;
 beforeEach(async () => {
@@ -20,15 +21,16 @@ const report = (overrides: Partial<Report> = {}): Report => ({
     durationMs: 1200,
     model: null,
     shipcheckVersion: '0.1.0',
-    mode: 'no-ai',
+    mode: 'full',
     partial: false,
-    llmCalls: 0,
+    llmCalls: 12,
   },
   verdict: 'ready',
   counts: { blocker: 0, major: 0, minor: 0, info: 0 },
   findings: [],
   passed: ['Home page opens'],
   notTested: [],
+  coverage: coverageFor('full'),
   actionLog: [],
   ...overrides,
 });

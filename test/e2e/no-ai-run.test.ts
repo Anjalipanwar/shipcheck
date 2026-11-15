@@ -186,10 +186,32 @@ describe('expected extras and nothing else', () => {
     expect(byRule('links/broken-other-link')).toEqual([]);
   });
 
-  it('verdict follows the rules: a Blocker means "not ready"', () => {
-    expect(report.verdict).toBe('not-ready');
+  it('verdict: a --no-ai run is never a launch verdict — “Automatic checks found issues”', () => {
+    expect(report.verdict).toBe('checks-found-issues');
     expect(report.counts).toEqual({ blocker: 1, major: 1, minor: 6, info: 1 });
     expect(report.findings[0]?.severity).toBe('blocker');
+  });
+
+  it('coverage: the visitor areas need the full check; every automatic area was really tested', () => {
+    expect(report.coverage.map((e) => [e.area, e.state, e.note ?? ''])).toEqual([
+      ['signup', 'not-tested', 'this needs the full check'],
+      ['login', 'not-tested', 'this needs the full check'],
+      ['core', 'not-tested', 'this needs the full check'],
+      ['forms', 'not-tested', 'this needs the full check'],
+      ['phone-flows', 'not-tested', 'this needs the full check'],
+      ['phone-layout', 'problems', ''],
+      ['errors', 'problems', ''],
+      ['links', 'problems', ''],
+      ['seo', 'problems', ''],
+      ['security', 'problems', ''],
+      ['accessibility', 'no-problems', ''],
+    ]);
+  });
+
+  it('“Ready to launch” appears in none of the written files', async () => {
+    for (const file of ['report.html', 'report.md', 'report.json']) {
+      expect(await readFile(join(outDir, file), 'utf8'), file).not.toContain('Ready to launch');
+    }
   });
 
   it('every finding has evidence, plain wording and steps or a reason', () => {
@@ -217,7 +239,7 @@ describe('expected extras and nothing else', () => {
       /No serious accessibility problems found on the 2 pages/,
     );
     expect(report.notTested.join('\n')).toMatch(
-      /on desktop and on a phone — these need an AI key \(this run used --no-ai\)\. The phone layout was checked/,
+      /on desktop and on a phone — these need the full check \(this run was automatic checks only\)\. The phone layout was checked/,
     );
     expect(report.meta).toMatchObject({
       mode: 'no-ai',
@@ -399,6 +421,11 @@ describe('covered button in a full run (owner decision 2026-11-15)', () => {
         ],
       ]);
       expect(covered[0]?.evidence.screenshots).toHaveLength(1);
+      // A page without any links was still checked: “Broken links” is ✓, not “nothing could be checked”.
+      expect(result.report.coverage.find((e) => e.area === 'links')).toEqual({
+        area: 'links',
+        state: 'no-problems',
+      });
       expect(
         result.report.actionLog
           .filter((a) => a.intent.startsWith('Close the banner'))
@@ -407,6 +434,25 @@ describe('covered button in a full run (owner decision 2026-11-15)', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe('coverage when the time runs out', () => {
+  it('checks the time limit stopped are “Not tested: the time limit was reached”, with what to do, and the verdict stays neutral', async () => {
+    const config = loadConfig(app.url, { ai: false, yes: true }, {});
+    // The smallest --max-minutes is 1; a run this short can only open the home page.
+    const result = await runShipCheck({ ...config, maxMinutes: 0.001 });
+    const notes = Object.fromEntries(result.report.coverage.map((e) => [e.area, e.note]));
+    const advice = 'the time limit was reached. Run ShipCheck again with a higher --max-minutes.';
+    expect(notes.seo).toBe(advice);
+    expect(notes.links).toBe(advice);
+    expect(notes.security).toMatch(/the time limit was reached/);
+    expect(notes['phone-layout']).toBe(
+      'ShipCheck ran out of time before this part. Run ShipCheck again with a higher --max-minutes.',
+    );
+    expect(result.report.coverage.find((e) => e.area === 'seo')?.state).toBe('not-tested');
+    expect(result.report.verdict).not.toBe('ready');
+    expect(() => ReportSchema.parse(result.report)).not.toThrow();
   });
 });
 
@@ -419,8 +465,16 @@ describe('robustness', () => {
     expect(result.report.findings.map((f) => [f.rule, f.severity])).toEqual([
       ['landing/not-loading', 'blocker'],
     ]);
-    expect(result.report.verdict).toBe('not-ready');
+    expect(result.report.verdict).toBe('checks-found-issues');
     expect(result.report.notTested.join()).toMatch(/home page did not load/);
+    // Nothing was tested — not even Hidden errors, although that check still looks at the run.
+    expect(result.report.coverage.every((e) => e.state === 'not-tested')).toBe(true);
+    expect(result.report.coverage[0]?.note).toBe(
+      'the home page did not load. Fix that first, then run ShipCheck again.',
+    );
+    expect(new Set(result.report.coverage.map((e) => e.note))).toEqual(
+      new Set(['the home page did not load. Fix that first, then run ShipCheck again.']),
+    );
     expect(() => ReportSchema.parse(result.report)).not.toThrow();
   });
 

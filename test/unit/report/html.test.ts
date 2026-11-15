@@ -82,13 +82,16 @@ describe('renderHtml', () => {
     expect(titles).toEqual([
       'Pre-launch report',
       'Verdict',
+      'What this report covers',
       'Fix these first',
       'Your app as ShipCheck saw it',
       'All issues (4)',
       'What worked',
       'What we couldn’t test',
     ]);
-    expect(html).toContain('<title>ShipCheck report — Not ready — myapp.example.com</title>');
+    expect(html).toContain(
+      '<title>ShipCheck report — Automatic checks found issues — myapp.example.com</title>',
+    );
     expect(html).toContain('13 November 2026, 17:57 UTC');
     expect(html).toContain('not a security audit');
   });
@@ -123,14 +126,20 @@ describe('renderHtml', () => {
     expect(html).toContain('aria-label="Enlarge screenshot: login failed (desktop)"');
   });
 
-  it('says so plainly when there is nothing to report', () => {
+  it('says so plainly when there is nothing to report — and a --no-ai run is never “Ready”', () => {
     const empty = renderHtml(makeReport([], { passed: [], notTested: [] }));
-    expect(empty).toContain('Ready to launch');
+    expect(empty).toContain('Automatic checks passed — app not tested as a user');
+    expect(empty).not.toContain('Ready to launch');
     expect(empty).toContain('Nothing urgent.');
     expect(empty).toContain('No issues found.');
     expect(empty).toContain('No checks passed in this run.');
     expect(empty).toContain('Nothing — every planned check ran.');
-    expect(empty).toContain('automatic checks only'); // the caveat keeps "Ready" honest
+    const full = makeReport([], {
+      meta: { ...makeReport().meta, mode: 'full', model: 'm', llmCalls: 9 },
+      passed: [],
+      notTested: [],
+    });
+    expect(renderHtml(full)).toContain('Ready to launch');
   });
 });
 

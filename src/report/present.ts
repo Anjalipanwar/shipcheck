@@ -1,4 +1,13 @@
-import type { Finding, Report, Severity, Verdict } from './schema.js';
+import { REPO_URL } from '../version.js';
+import type {
+  CoverageArea,
+  CoverageEntry,
+  CoverageState,
+  Finding,
+  Report,
+  Severity,
+  Verdict,
+} from './schema.js';
 
 /**
  * Wording and grouping shared by every report format (HTML, Markdown, terminal),
@@ -9,15 +18,198 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   ready: 'Ready to launch',
   'fix-before-launch': 'Fix before launch',
   'not-ready': 'Not ready',
+  'partly-tested': 'Partly tested — no serious problems found so far',
+  'checks-passed': 'Automatic checks passed — app not tested as a user',
+  'checks-found-issues': 'Automatic checks found issues',
 };
 
-export const VERDICT_SUMMARY: Record<Verdict, string> = {
-  ready: 'ShipCheck found nothing that should stop you from launching.',
-  'fix-before-launch':
-    'The app works, but some problems will confuse or lose real users. Fix the major issues before you launch.',
-  'not-ready':
-    'At least one problem would stop a new user or put your accounts at risk. Fix the blockers before you launch.',
+const NOT_USED_AS_VISITOR = 'ShipCheck did not use your app like a visitor';
+
+/** The sentence under the verdict. Neutral verdicts still say plainly when a Blocker was found. */
+export function verdictSummary(report: Pick<Report, 'verdict' | 'counts'>): string {
+  switch (report.verdict) {
+    case 'ready':
+      return 'ShipCheck found nothing that should stop you from launching.';
+    case 'fix-before-launch':
+      return 'The app works, but some problems will confuse or lose real users. Fix the major issues before you launch.';
+    case 'not-ready':
+      return 'At least one problem would stop a new user or is a security risk. Fix the blockers before you launch.';
+    case 'partly-tested':
+      return 'ShipCheck found no blockers or major problems in the parts it could test, but some areas were not tested (marked ○ or “Only partly tested” below). Check those yourself before you launch.';
+    case 'checks-passed':
+      return `The automatic checks found nothing to fix. ${NOT_USED_AS_VISITOR}, so this is not a launch verdict.`;
+    case 'checks-found-issues': {
+      const lead =
+        report.counts.blocker > 0
+          ? 'At least one is a blocker: fix it before you launch. '
+          : report.counts.major > 0
+            ? 'At least one is major: fix it before you launch. '
+            : '';
+      return `${lead}${NOT_USED_AS_VISITOR}, so a full check may find more.`;
+    }
+  }
+}
+
+/** Banner colour: neutral verdicts take the colour of the worst finding, never green. */
+export type VerdictTone = 'ok' | 'blocker' | 'major' | 'neutral';
+export function verdictTone(report: Pick<Report, 'verdict' | 'counts'>): VerdictTone {
+  if (report.verdict === 'ready') return 'ok';
+  if (report.verdict === 'not-ready') return 'blocker';
+  if (report.verdict === 'fix-before-launch') return 'major';
+  if (report.counts.blocker > 0) return 'blocker';
+  if (report.counts.major > 0) return 'major';
+  return 'neutral';
+}
+
+/** "Fix these first" when there is nothing to fix: it may only promise what the verdict does. */
+export function nothingUrgentText(report: Pick<Report, 'verdict'>): string {
+  switch (report.verdict) {
+    case 'checks-passed':
+    case 'checks-found-issues':
+      return 'Nothing urgent. The automatic checks found nothing that needs fixing first.';
+    case 'partly-tested':
+      return 'Nothing urgent in the parts ShipCheck could test.';
+    default:
+      return 'Nothing urgent. ShipCheck found no problems that need fixing before launch.';
+  }
+}
+
+/* ---- “What this report covers” (owner decisions 2026-11-15) -------------------------- */
+
+export const COVERAGE_TITLE = 'What this report covers';
+
+export const AREA_LABEL: Record<CoverageArea, string> = {
+  signup: 'Sign-up',
+  login: 'Log-in',
+  core: 'Main feature',
+  forms: 'Forms (including wrong or missing input)',
+  'phone-flows': 'Using it on a phone',
+  'phone-layout': 'Phone screen layout',
+  errors: 'Hidden errors',
+  links: 'Broken links',
+  seo: 'SEO',
+  security: 'Basic security',
+  accessibility: 'Accessibility',
 };
+
+export const GROUP_LABEL = {
+  visitor: 'Using your app like a visitor (full check only)',
+  automatic: 'Automatic checks (always run)',
+} as const;
+
+export const CHECK_TYPE_LABEL: Record<Report['meta']['mode'], string> = {
+  full: 'Full check (AI)',
+  'no-ai': 'Automatic checks only (no AI)',
+};
+
+/** "Tried to": the rows below say how far it got, so this never claims a step that did not happen. */
+export const COVERAGE_DID: Record<Report['meta']['mode'], string> = {
+  full: 'ShipCheck tried to use your app like a new visitor: signing up, logging in, using the main feature and filling in forms, on desktop and on a phone. It also ran the automatic checks. The list shows how far it got.',
+  'no-ai':
+    'ShipCheck loaded your pages and checked them from the outside: hidden errors, broken links, phone screen layout, SEO and basic security. It did not sign up, log in or use any feature.',
+};
+
+/** Shown in automatic-only reports. */
+export const COVERAGE_WHY_DIFFER =
+  'Automatic checks can’t find problems that only appear when someone uses the app, such as a sign-up that fails or a button that does nothing. That’s why a full check often finds more than automatic checks.';
+
+export const COVERAGE_TABLE_CAPTION = 'What happened in each area';
+
+export const COVERAGE_NEXT_LABEL: Record<Report['meta']['mode'], string> = {
+  full: 'Please note:',
+  'no-ai': 'Next step:',
+};
+
+export const COVERAGE_NEXT_FULL =
+  'This is not a guarantee that your app is free of bugs. Anything ShipCheck could not test is listed under “What we couldn’t test”.';
+
+export const COVERAGE_NEXT_NO_AI =
+  'Run the full check to test your app like a real visitor. You need a free AI key.';
+
+export const AI_KEY_HELP = {
+  text: 'How to get a free AI key',
+  url: `${REPO_URL}#get-a-free-ai-key`,
+};
+
+/** The command for the full check. The address is quoted when a shell could misread it (&, ?, #…). */
+export function fullCheckCommand(url: string): string {
+  const safe = /^[A-Za-z0-9:/._~%-]+$/.test(url);
+  return `npx @anjalipanwar/shipcheck ${safe ? url : `"${url.replace(/(["\\$`])/g, '\\$1')}"`}`;
+}
+
+/** The reason a visitor area shows in an automatic-only report. */
+export const NEEDS_FULL_CHECK = 'this needs the full check';
+
+/** What the user can do about a "not tested" area. Every such reason ends with one of these. */
+export const ADVICE = {
+  quota: 'Try again tomorrow, or use a paid key',
+  calls: 'Run ShipCheck again with fewer parts at a time, for example --flows core',
+  time: 'Run ShipCheck again with a higher --max-minutes',
+  account: 'Add a test account (see the README)',
+  goal: 'Describe the main task with --goal "…"',
+  goalOrHand: 'Check it by hand, or describe the task with --goal "…"',
+  byHand: 'Check this part by hand',
+  retry: 'Try again; if it keeps happening, please report it',
+  payment: 'Test the payment step yourself, in your payment provider’s test mode',
+  fixHome: 'Fix that first, then run ShipCheck again',
+  key: 'Check your AI key and try again',
+} as const;
+
+export const STATE_ICON: Record<CoverageState, string> = {
+  'no-problems': '✓',
+  problems: '⚠',
+  'not-tested': '○',
+  skipped: '—',
+  absent: '—',
+};
+
+/** The words next to the icon. Reasons and next steps are added by `stateNote`. */
+export function stateText(entry: CoverageEntry): string {
+  switch (entry.state) {
+    case 'no-problems':
+      return 'No problems found';
+    case 'problems':
+      return `${entry.problems ?? 1} ${entry.problems === 1 || !entry.problems ? 'problem' : 'problems'}`;
+    case 'not-tested':
+      return entry.note ? `Not tested: ${entry.note}` : 'Not tested';
+    case 'skipped':
+      return entry.note ? `Skipped by your choice: ${entry.note}` : 'Skipped by your choice';
+    case 'absent':
+      return entry.note ? `Not in your app: ${entry.note}` : 'Not in your app';
+  }
+}
+
+/** Extra line for an area with problems that could also only partly be tested. */
+export function partialNote(entry: CoverageEntry): string | undefined {
+  return entry.state === 'problems' && entry.partial
+    ? `Only partly tested${entry.note ? `: ${entry.note}` : ''}`
+    : undefined;
+}
+
+/** Problems that belong to no row (page speed, a dead button on the home page…). */
+export function otherProblemsText(count: number): string {
+  return `${count} more ${count === 1 ? 'problem is' : 'problems are'} not part of one of these areas (for example page speed or the home page itself). See “All issues”.`;
+}
+
+/** The terminal's one-line version of the box. */
+export function coverageLine(report: Pick<Report, 'meta' | 'coverage'>): string {
+  const names = (state: CoverageState[]) =>
+    report.coverage.filter((e) => state.includes(e.state)).map((e) => AREA_LABEL[e.area]);
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const fine = names(['no-problems']).length;
+  const problems = names(['problems']);
+  const untested = names(['not-tested']);
+  const skipped = names(['skipped']);
+  const absent = names(['absent']);
+  const parts = [
+    `${count(fine, 'area', 'areas')} without problems`,
+    ...(problems.length > 0 ? [`problems in: ${problems.join(', ')}`] : []),
+    ...(untested.length > 0 ? [`not tested: ${untested.join(', ')}`] : []),
+    ...(skipped.length > 0 ? [`skipped by your choice: ${skipped.join(', ')}`] : []),
+    ...(absent.length > 0 ? [`not in your app: ${absent.join(', ')}`] : []),
+  ];
+  return `${COVERAGE_TITLE}: ${CHECK_TYPE_LABEL[report.meta.mode]} — ${parts.join('; ')}.`;
+}
 
 export const SEVERITY_LABEL: Record<Severity, string> = {
   blocker: 'Blocker',
@@ -114,9 +306,19 @@ export function groupFindings(findings: readonly Finding[]): FindingGroup[] {
   })).filter((group) => group.findings.length > 0);
 }
 
-export function countsLine(counts: Report['counts']): string {
-  return SEVERITIES.map((severity) => `${counts[severity]} ${severity}`).join(' · ');
+/** "1 Blocker", "2 Blockers"; Major, Minor and Info are describing words and stay as they are. */
+export function severityCount(severity: Severity, count: number): string {
+  const label = SEVERITY_LABEL[severity];
+  return `${count} ${severity === 'blocker' && count !== 1 ? `${label}s` : label}`;
 }
+
+export function countsLine(counts: Report['counts']): string {
+  return SEVERITIES.map((severity) => severityCount(severity, counts[severity])).join(' · ');
+}
+
+/** One line under the counts, in every format. */
+export const SEVERITY_LEGEND =
+  'Blocker = stops people using your app · Major = breaks or confuses many people · Minor = polish';
 
 const MONTHS = [
   'January',
@@ -154,23 +356,4 @@ export function modelLine(meta: Report['meta']): string {
   if (meta.mode === 'no-ai' || !meta.model) return 'None — automatic checks only';
   const limit = meta.llmCallLimit ? ` of ${meta.llmCallLimit} allowed` : '';
   return `${meta.model} (${meta.llmCalls} AI ${meta.llmCalls === 1 ? 'call' : 'calls'}${limit})`;
-}
-
-/**
- * Honest caveats shown right under the verdict. Without them, "Ready to launch" after a run that
- * never tried to sign up would promise more than ShipCheck actually checked.
- */
-export function runCaveats(report: Report): string[] {
-  const caveats: string[] = [];
-  if (report.meta.mode === 'no-ai') {
-    caveats.push(
-      'This verdict is based on the automatic checks only. Signing up, logging in, the main feature and forms were not tested (on desktop or on a phone), because this run used no AI key. The phone layout was checked.',
-    );
-  }
-  if (report.meta.partial) {
-    caveats.push(
-      'This run stopped early, so only part of the app was tested. See “What we couldn’t test” below.',
-    );
-  }
-  return caveats;
 }

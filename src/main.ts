@@ -5,7 +5,7 @@ import { CommanderError } from 'commander';
 import { chooseModel } from './ai/models.js';
 import { ConfigError, loadConfig, type Config } from './config.js';
 import { buildProgram, EXIT } from './program.js';
-import { VERDICT_LABEL, countsLine } from './report/present.js';
+import { SEVERITY_LEGEND, VERDICT_LABEL, countsLine, coverageLine } from './report/present.js';
 import type { Report } from './report/schema.js';
 import { topIssues } from './report/verdict.js';
 import { writeReport } from './report/write.js';
@@ -60,6 +60,8 @@ async function run(urlArg: string, flags: Record<string, unknown>): Promise<numb
   const { report } = result;
   print(`\nVerdict: ${VERDICT_LABEL[report.verdict]}`);
   print(`  ${countsLine(report.counts)}`);
+  print(`  ${SEVERITY_LEGEND}`);
+  print(`  ${coverageLine(report)}`);
   const top = topIssues(report.findings);
   if (top.length > 0) {
     print('\nFix these first:');

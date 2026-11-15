@@ -3,8 +3,8 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, M5 follow-ups pushed
-- **Next up:** owner reviews the real-app summary. **Do not start M6** until the owner says "go" (owner, 2026-11-15). Recommended first: fix the password-in-report gap (lesson 3).
+- **Last updated:** 2026-11-15, coverage box (four states) + password fix committed; M6 started
+- **Next up:** M6 (owner said "go" on 2026-11-15). Start with the false-alarm fixture (see `docs/BUILD_PLAN.md`). Ask the owner about pushing the coverage-box commit. Five wording/behaviour choices are still waiting for the owner's answer (see "Honest verdicts" section).
 
 ## Overview
 
@@ -311,6 +311,42 @@ The owner's own app (address and report kept outside this public repo, as agreed
 5. Small: "Get started … leads somewhere" listed twice under what worked; "a problem that make" grammar in the accessibility finding.
 
 **Side effects on the owner's app:** two test accounts (`shipcheck+…@example.com`, desktop and phone sign-up) and one contact-form message with test text. The invalid and empty submissions were stopped by the app's own checks.
+
+---
+
+## Honest verdicts and "What this report covers" (owner decisions of 2026-11-15)
+
+- **Status:** done — the owner answered "go" on 2026-11-15 after the second set of screenshots (taken as approval and as the go-ahead for M6)
+- **Commit:** —
+- **Pushed:** — (`8bc6084`, `80c4376`, `0254d7f` were pushed on 2026-11-15; origin/main = `0254d7f`, CI green)
+
+**Owner decisions (2026-11-15), all recorded in SPEC §13**
+
+1. A `--no-ai` run never says "Ready to launch" (neutral verdicts instead); an AI run that stopped early never promises more than was tested; a permanent "What this report covers" box under the verdict in report.html, report.md, the step summary, plus a terminal line.
+2. After reviewing the first screenshots as a non-technical user: the ✓/✗ table is replaced by **four states** — ✓ No problems found · ⚠ N problems (colour of the worst, linked) · ○ Not tested (grey, reason + what to do; keeps "Partly tested") · — Skipped by your choice / Not in your app (does not block "Ready to launch"). Two groups with headings; plain labels ("Using it on a phone", "Phone screen layout", "Forms (including wrong or missing input)"); "tried to use your app" intro; "this needs the full check"; "…or is a security risk"; the "Automatic checks can't find…" paragraph only in automatic-only reports; chip plurals and a one-line severity legend; same wording in all four outputs.
+3. Approved as built: Info-only `--no-ai` run → "Automatic checks passed"; Blocker in a `--no-ai` run → "Automatic checks found issues" in red.
+4. No password — including ones ShipCheck creates or the AI invents — may appear in any output; with a test.
+5. M9/M10 checklist: every command and link shown in reports must work, with a test that the linked README section exists. M6: a fixture reproducing the real-app sign-up false alarm, and proof that the judge no longer reports it. (Both added to `docs/BUILD_PLAN.md`.)
+
+**What was built:** verdicts `partly-tested`, `checks-passed`, `checks-found-issues`; `coverage` in `report.json` with a state per area, recorded by the runner (`src/coverage.ts`) and counted against the findings (`src/report/areas.ts` says which row a finding belongs to); flows report _why_ something was not done (`gaps`: blocked / the user's choice / not in the app) with the next step; the verdict is derived from findings + mode + coverage and the schema refuses a verdict that promises more; one view (`src/report/coverage-view.ts`) feeds HTML, Markdown and step summary. Password fix in `FlowContext.perform()`.
+
+**How it was verified:** typecheck and lint clean, 485 unit tests and 120 real-browser tests pass. Eight deliberate breakages were each caught (skipped counted as untested; "Not tested" no longer blocking "ready"; link to the worst finding dropped; "Automatic checks can't find…" shown in full reports; a phone sign-up problem counted under layout; a partly tested area not counted as untested; problems outside the rows hidden; phone pass not inheriting "Not in your app"). Unit tests for every state, the grouping and order, links to findings, plurals, legend, "never claims it signed up"; real-browser tests for the box in a real report, the AI-call limit, the time limit, `--flows`, `--skip-mobile`, a dead app; `test/e2e/no-password-in-output.test.ts` (fails when the protection is removed — tried). Screenshots of five cases, desktop and phone, sent to the owner.
+
+**Added after an internal review, before the commit**
+
+- An app without sign-up or log-in: "Not in your app" found on desktop also holds for the phone pass, so it no longer shows "Not tested" under "Using it on a phone" (which would have blocked "Ready to launch").
+- A problem found only while using the app on a phone (e.g. the sign-up button that does nothing) counts under "Using it on a phone", not under "Phone screen layout".
+- Problems that belong to no row (page speed, a dead button on the home page, a home page that does not load) are mentioned in one line under the table, so the box never looks cleaner than the counts.
+- The report is scrubbed of passwords before the runner returns it, so the terminal and step summary are covered too, not only the written files.
+
+**Choices made where the decisions left room (still open — the owner has not answered yet)**
+
+- Plurals: "2 Blockers", but "4 Major", "7 Minor", "1 Info" stay (describing words).
+- Log-in / sign-up is "Not in your app" only when neither a link nor a form is found on desktop.
+- A flow stopped at a payment step counts as "Not tested".
+- AI-call-limit advice: "Run ShipCheck again with fewer parts at a time, for example --flows core" (there is no flag to raise the limit).
+- Passwords shorter than 4 characters are not scrubbed.
+- Still true until M9/M10: the `npx @anjalipanwar/shipcheck …` command works only after the npm release, and the README sections the report points to (`#get-a-free-ai-key`, test accounts) are written in M9.
 
 ---
 

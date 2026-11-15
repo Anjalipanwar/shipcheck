@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROMPTS } from '../ai/prompts.js';
+import { ADVICE } from '../report/present.js';
 import type { FlowBody } from './context.js';
 
 const MAX_GOAL_STEPS = 6;
@@ -23,6 +24,7 @@ export const coreFlow: FlowBody = async (ctx) => {
     if (!goal) {
       ctx.skip(
         'Main feature — ShipCheck could not tell what the app’s main action is. Tell it with --goal "…"',
+        { action: ADVICE.goal },
       );
       return;
     }
@@ -56,13 +58,16 @@ export const coreFlow: FlowBody = async (ctx) => {
     if (isText && value && value.trim().length >= 3 && result.facts?.type !== 'password') {
       typed.push(value.trim());
     }
-    done.push(isText && value ? `typed “${value}” into ${next.description}` : next.description);
+    // A password is never written down, not even one the AI made up.
+    const shown = result.facts?.type === 'password' ? 'a password' : `“${value}”`;
+    done.push(isText && value ? `typed ${shown} into ${next.description}` : next.description);
   }
 
   const performed = done.filter((line) => !/^(not allowed|could not do)/.test(line));
   if (performed.length === 0) {
     ctx.skip(
       `Main feature — ShipCheck found no way to “${goal}” on ${startUrl}. Describe the main task with --goal "…"`,
+      { reason: 'ShipCheck found no way to use the main feature', action: ADVICE.goal },
     );
     return;
   }
@@ -104,6 +109,10 @@ export const coreFlow: FlowBody = async (ctx) => {
       // No error on screen and no proof either way: saying "broken" would be a guess.
       ctx.skip(
         `Main feature — ShipCheck tried to “${goal}” but could not confirm whether it worked. Please check it by hand, or describe the task more exactly with --goal "…"`,
+        {
+          reason: 'ShipCheck tried the main feature but could not confirm whether it worked',
+          action: ADVICE.goalOrHand,
+        },
       );
       return;
     }
