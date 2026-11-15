@@ -14,6 +14,7 @@ export default defineConfig({
         test: {
           name: 'e2e',
           include: ['test/e2e/**/*.test.ts'],
+          globalSetup: ['test/helpers/build-once.ts'],
           environment: 'node',
           testTimeout: 120_000,
           hookTimeout: 120_000,

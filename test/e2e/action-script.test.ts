@@ -13,15 +13,16 @@ import { startFixtureServer, type FixtureServer } from '../helpers/fixture-serve
  * the way GitHub gives them (environment variables), against the pretend app.
  */
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const script =
-  runScripts(readRepoFile('action.yml')).find((s) => s.includes('SHIPCHECK_CLI')) ?? '';
+const scripts = runScripts(readRepoFile('action.yml'));
+const script = scripts.find((s) => s.includes('SHIPCHECK_CLI')) ?? '';
+/** The action's last step: fails the job with ShipCheck's exit code, after the upload. */
+const resultScript = scripts.find((s) => s.includes('exit "$EXIT_CODE"')) ?? '';
 
 describe('the action’s “Run ShipCheck” script', () => {
   let app: FixtureServer;
   let dir: string;
   beforeAll(async () => {
-    const build = spawn('npm', ['run', 'build'], { cwd: root, stdio: 'ignore' });
-    expect(await new Promise((resolve) => build.on('exit', resolve))).toBe(0);
+    // dist/ was built once before all browser tests (test/helpers/build-once.ts).
     app = await startFixtureServer();
   });
   afterAll(async () => {
@@ -68,7 +69,7 @@ describe('the action’s “Run ShipCheck” script', () => {
     let output = '';
     child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()));
     child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()));
-    const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
+    const runStep = await new Promise<number | null>((resolve) => child.on('exit', resolve));
     const outputsFile = join(dir, 'github-output.txt');
     const outputs = Object.fromEntries(
       (existsSync(outputsFile) ? readFileSync(outputsFile, 'utf8') : '')
@@ -76,11 +77,21 @@ describe('the action’s “Run ShipCheck” script', () => {
         .filter(Boolean)
         .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]),
     );
-    return { code, output, outputs };
+    // The run step itself never fails (so the report is uploaded next); the last step does.
+    const last = spawn('bash', ['-e', '-o', 'pipefail', '-c', resultScript], {
+      cwd: dir,
+      env: { PATH: process.env.PATH ?? '', EXIT_CODE: String(outputs['exit-code'] ?? '') },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    last.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()));
+    last.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()));
+    const code = await new Promise<number | null>((resolve) => last.on('exit', resolve));
+    return { code, runStep, output, outputs };
   }
 
-  it('found the script in action.yml', () => {
+  it('found both scripts in action.yml', () => {
     expect(script).toContain('node "$SHIPCHECK_CLI"');
+    expect(resultScript).toContain('exit "$EXIT_CODE"');
   });
 
   it('automatic checks, fail-on none: succeeds, writes the report, the summary and the outputs', async () => {
@@ -105,12 +116,14 @@ describe('the action’s “Run ShipCheck” script', () => {
   });
 
   it('default fail-on: a Blocker fails the step with exit code 1, outputs and report are still there', async () => {
-    const { code, outputs } = await runAction({
+    const { code, runStep, output, outputs } = await runAction({
       INPUT_URL: app.url,
       INPUT_NO_AI: 'true',
       INPUT_SKIP_MOBILE: 'true',
     });
+    expect(runStep).toBe(0); // the report can still be uploaded
     expect(code).toBe(1);
+    expect(output).toContain('ShipCheck found problems');
     expect(outputs['exit-code']).toBe('1');
     expect(outputs.verdict).toBe('checks-found-issues');
     expect(existsSync(join(dir, 'shipcheck-report/report.html'))).toBe(true);

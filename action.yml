@@ -84,6 +84,8 @@ runs:
       uses: actions/setup-node@v7
       with:
         node-version: '22'
+        # ShipCheck must not touch the package cache of the repository that uses it.
+        package-manager-cache: false
 
     # ShipCheck is built from this action's own files, so nothing has to be published or
     # downloaded from a package registry. A second run in the same job reuses the build.
@@ -92,7 +94,8 @@ runs:
       working-directory: ${{ github.action_path }}
       run: |
         if [ ! -f dist/cli.js ] || [ ! -d node_modules ]; then
-          npm ci --no-audit --no-fund
+          # Also when the job sets NODE_ENV=production: the build tools are needed.
+          npm ci --include=dev --no-audit --no-fund
           npm run build
         fi
         npx playwright install --with-deps chromium
@@ -142,13 +145,24 @@ runs:
           echo "exit-code=$code"
           echo "report-dir=$INPUT_OUT"
         } >> "$GITHUB_OUTPUT"
-        exit "$code"
 
-    # Also when problems were found (the step above then fails): that is when the report matters.
+    # The step above never fails by itself, so the report is always uploaded — also when
+    # problems were found, which is when it matters. The last step then fails the job.
     - name: Upload the report
-      if: ${{ !cancelled() }}
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ inputs.out }}
         if-no-files-found: ignore
+
+    - name: Result
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.run.outputs.exit-code }}
+      run: |
+        if [ "$EXIT_CODE" = "1" ]; then
+          echo "ShipCheck found problems at or above the fail-on level. Open the run summary, or report.html in the uploaded artifact."
+        elif [ "$EXIT_CODE" != "0" ]; then
+          echo "ShipCheck could not run (exit code $EXIT_CODE). The messages of the step before this one say why."
+        fi
+        exit "$EXIT_CODE"

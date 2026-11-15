@@ -18,7 +18,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M5 — Mobile pass                                     | done                                 | `f168b9e`                        | yes                                                         |
 | M6 — AI judge, fix prompts, dedupe                   | done                                 | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
 | M7 — CLI polish                                      | done                                 | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
-| M8 — GitHub Action                                   | built locally, not yet run on GitHub | see M8 section                   | no                                                          |
+| M8 — GitHub Action                                   | built locally, not yet run on GitHub | `8727d73` + follow-up            | no                                                          |
 | M9 — Docs and launch assets                          | not started                          | —                                | —                                                           |
 | M10 — Release                                        | not started                          | —                                | —                                                           |
 
@@ -416,7 +416,7 @@ The owner's own app (address and report kept outside this public repo, as agreed
 ## M8 — GitHub Action
 
 - **Status:** built and tested locally; **not done** — the plan's condition is "the action runs green in this repo's CI", and that needs a push
-- **Commit:** see the overview table once pushed (local commit after `2ae567d`)
+- **Commit:** `8727d73`, plus a follow-up commit (report uploaded before the job is failed; the caller's package cache and `NODE_ENV` left alone; the package built once for all browser tests)
 - **Pushed:** no — to be asked
 
 **What was built**
@@ -426,7 +426,7 @@ The owner's own app (address and report kept outside this public repo, as agreed
 3. **`examples/github-workflow.yml`:** the file users copy — started by hand, push trigger ready to switch on, secrets from repository secrets, four numbered steps in plain words.
 4. **`.github/workflows/action-selftest.yml`:** starts the pretend app (`npm run fixture`) and runs the action from this repository three times, automatic checks only, no key: lenient (`fail-on: none` → green, report files and outputs checked), strict (a Blocker must fail the step with exit code 1, report still written), and without a key (exit code 2, nothing written).
 
-**How it was verified (locally — GitHub Actions cannot run on a laptop):** typecheck and lint clean, 573 unit tests and 179 real-browser tests pass. `test/unit/action.test.ts` reads the action and workflow files: spec inputs present, an input for every flag of the command, nothing from the workflow pasted into a script, secrets only through the environment, the example uses only inputs that exist. `test/e2e/action-script.test.ts` runs the action's own "Run ShipCheck" script exactly as written against the fixture: exit codes 0, 1 and 2, outputs, report, run summary, hostile input values (quotes, `$( )`, backticks, `;`) run nothing, the password appears nowhere. Deliberate breakages, each failing a test: an input pasted into the script; ShipCheck's exit code not caught; the step always green; an input evaluated by the shell; the password passed as an argument. The versions of the three GitHub actions used (`checkout`, `setup-node`, `upload-artifact`, all v7) were read from their repositories.
+**How it was verified (locally — GitHub Actions cannot run on a laptop):** typecheck and lint clean, 573 unit tests and 179 real-browser tests pass. `test/unit/action.test.ts` reads the action and workflow files: spec inputs present, an input for every flag of the command, nothing from the workflow pasted into a script, secrets only through the environment, the example uses only inputs that exist. `test/e2e/action-script.test.ts` runs the action's own "Run ShipCheck" script exactly as written against the fixture: exit codes 0, 1 and 2, outputs, report, run summary, hostile input values (quotes, `$( )`, backticks, `;`) run nothing, the password appears nowhere. Deliberate breakages, each failing a test: an input pasted into the script; ShipCheck's exit code not caught; the job always green; an input evaluated by the shell; the password passed as an argument. The versions of the three GitHub actions used (`checkout`, `setup-node`, `upload-artifact`, all v7) were read from their repositories.
 
 **Not verified:** anything that only GitHub can run — the composite steps as a whole (Node set-up, build inside the action's folder, Chromium install, artifact upload), and the self-test workflow itself. The example's `@v0` tag does not exist before M10.
 

@@ -294,12 +294,11 @@ describe('the shipcheck command', () => {
   });
 });
 
-describe('the built package (npm run build, then node dist/cli.js)', () => {
+describe('the built package (node dist/cli.js after npm run build)', () => {
   let app: FixtureServer;
   let dir: string;
   beforeAll(async () => {
-    const build = spawn('npm', ['run', 'build'], { cwd: root, stdio: 'ignore' });
-    expect(await new Promise((resolve) => build.on('exit', resolve))).toBe(0);
+    // dist/ was built once before all browser tests (test/helpers/build-once.ts).
     app = await startFixtureServer();
     dir = mkdtempSync(join(tmpdir(), 'shipcheck-dist-'));
   });

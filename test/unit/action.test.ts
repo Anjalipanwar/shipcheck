@@ -27,14 +27,21 @@ describe('action.yml (SPEC §5.2)', () => {
     expect(action).toMatch(/uses: actions\/setup-node@v\d+/);
     expect(action).toMatch(/uses: actions\/upload-artifact@v\d+/);
     expect(action).toContain('npx playwright install --with-deps chromium');
-    // The report is uploaded also when problems were found (the run step then fails).
-    expect(action).toMatch(/name: Upload the report\n\s+if: \$\{\{ !cancelled\(\) \}\}/);
     expect(action).toContain('if-no-files-found: ignore');
+    // Order: run (never fails by itself) → upload the report → fail the job with the exit code.
+    const order = ['id: run', 'name: Upload the report', 'name: Result', 'exit "$EXIT_CODE"'].map(
+      (text) => action.indexOf(text),
+    );
+    expect(order.every((at) => at > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // It leaves the caller's package cache alone and builds also under NODE_ENV=production.
+    expect(action).toContain('package-manager-cache: false');
+    expect(action).toContain('npm ci --include=dev');
   });
 
   it('never pastes anything from the workflow into a script (script injection)', () => {
     const scripts = runScripts(action);
-    expect(scripts.length).toBe(2);
+    expect(scripts.length).toBe(3);
     for (const script of scripts) expect(script).not.toContain('${{');
   });
 
