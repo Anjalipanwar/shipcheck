@@ -160,7 +160,7 @@ export function renderMarkdown(report: Report): string {
 }
 
 /** Short version for the GitHub Actions run page (SPEC §5.2): verdict plus an issue table. */
-export function renderStepSummary(report: Report): string {
+export function renderStepSummary(report: Report, artifactName = 'shipcheck-report'): string {
   const lines = [
     '## ShipCheck report',
     '',
@@ -185,7 +185,7 @@ export function renderStepSummary(report: Report): string {
   }
   lines.push(
     '',
-    'The full report with evidence and fix prompts is in the `shipcheck-report` artifact of this run (open `report.html`).',
+    `The full report with evidence and fix prompts is in the \`${artifactName}\` artifact of this run (open \`report.html\`).`,
     '',
   );
   return lines.join('\n');

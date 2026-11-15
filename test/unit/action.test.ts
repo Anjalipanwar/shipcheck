@@ -1,0 +1,86 @@
+import { describe, expect, it } from 'vitest';
+import { buildProgram } from '../../src/program.js';
+import { actionInputs, readRepoFile, runScripts, withOf } from '../helpers/action-file.js';
+
+const action = readRepoFile('action.yml');
+const example = readRepoFile('examples/github-workflow.yml');
+const selftest = readRepoFile('.github/workflows/action-selftest.yml');
+
+describe('action.yml (SPEC §5.2)', () => {
+  const inputs = actionInputs(action);
+
+  it('has the inputs the spec names, and one for every setting of the command', () => {
+    expect(inputs).toEqual(
+      expect.arrayContaining(['url', 'gemini-api-key', 'email', 'password']), // SPEC §5.2
+    );
+    // Every flag of the command can be set from a workflow — except the two that make no
+    // sense there: --headed (no screen) and --yes (always given: a workflow cannot be asked).
+    const flags = buildProgram(() => Promise.resolve())
+      .options.map((option) => option.long?.replace(/^--/, '') ?? '')
+      .filter((flag) => !['version', 'headed', 'yes'].includes(flag));
+    expect(flags.length).toBeGreaterThanOrEqual(10);
+    for (const flag of flags) expect(inputs, `input for --${flag}`).toContain(flag);
+  });
+
+  it('is a composite action that sets up Node, runs ShipCheck and uploads the report', () => {
+    expect(action).toMatch(/using: 'composite'/);
+    expect(action).toMatch(/uses: actions\/setup-node@v\d+/);
+    expect(action).toMatch(/uses: actions\/upload-artifact@v\d+/);
+    expect(action).toContain('npx playwright install --with-deps chromium');
+    // The report is uploaded also when problems were found (the run step then fails).
+    expect(action).toMatch(/name: Upload the report\n\s+if: \$\{\{ !cancelled\(\) \}\}/);
+    expect(action).toContain('if-no-files-found: ignore');
+  });
+
+  it('never pastes anything from the workflow into a script (script injection)', () => {
+    const scripts = runScripts(action);
+    expect(scripts.length).toBe(2);
+    for (const script of scripts) expect(script).not.toContain('${{');
+  });
+
+  it('hands the password and the AI keys to ShipCheck through the environment, not as arguments', () => {
+    const run = runScripts(action).find((script) => script.includes('SHIPCHECK_CLI')) ?? '';
+    expect(run).not.toMatch(/PASSWORD|API_KEY|EMAIL/);
+    expect(run).not.toContain('--password');
+    expect(action).toContain('SHIPCHECK_PASSWORD: ${{ inputs.password }}');
+    expect(action).toContain('GEMINI_API_KEY: ${{ inputs.gemini-api-key }}');
+  });
+
+  it('every input it reads is one it declares', () => {
+    const read = [...action.matchAll(/\$\{\{ inputs\.([a-z0-9-]+) \}\}/g)].map((m) => m[1]);
+    expect(read.length).toBeGreaterThan(10);
+    for (const name of read) expect(inputs).toContain(name);
+    // …and every declared input is used.
+    for (const name of inputs) expect(read, `input ${name} is never read`).toContain(name);
+  });
+});
+
+describe('examples/github-workflow.yml (the file users copy)', () => {
+  it('uses the published action with inputs that exist, and takes secrets from repository secrets', () => {
+    const used = withOf(example, 'Anjalipanwar/shipcheck@v0');
+    expect(Object.keys(used)).toEqual(['url', 'gemini-api-key', 'email', 'password']);
+    for (const name of Object.keys(used)) expect(actionInputs(action)).toContain(name);
+    expect(used['gemini-api-key']).toContain('${{ secrets.GEMINI_API_KEY }}');
+    expect(used.password).toContain('${{ secrets.SHIPCHECK_PASSWORD }}');
+    // The commented-out options exist too.
+    const optional = [...example.matchAll(/^\s+# ([a-z-]+): /gm)].map((m) => m[1] ?? '');
+    expect(optional.length).toBeGreaterThanOrEqual(4);
+    for (const name of optional) expect(actionInputs(action)).toContain(name);
+  });
+
+  it('can be started by hand, has the push trigger ready to switch on, and asks for no extra rights', () => {
+    expect(example).toMatch(/^ {2}workflow_dispatch:/m);
+    expect(example).toMatch(/^ {2}# push:/m);
+    expect(example).toMatch(/permissions:\n {2}contents: read/);
+    expect(example).toContain('Only test apps you own or have permission to test.');
+  });
+});
+
+describe('.github/workflows/action-selftest.yml', () => {
+  it('runs the action from this repository against the local pretend app, without any key', () => {
+    expect(selftest.match(/uses: \.\/\n/g)).toHaveLength(3);
+    expect(selftest).not.toMatch(/secrets\./);
+    expect(selftest).not.toMatch(/https?:\/\/(?!127\.0\.0\.1)/); // no real website
+    for (const script of runScripts(selftest)) expect(script).not.toContain('${{');
+  });
+});

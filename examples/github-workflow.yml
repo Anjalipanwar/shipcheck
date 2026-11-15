@@ -1,0 +1,43 @@
+# ShipCheck — check your app before you launch.
+#
+# How to use this file:
+#   1. Copy it into your repository as  .github/workflows/shipcheck.yml
+#   2. Change the address below to your app's address.
+#   3. In GitHub: Settings → Secrets and variables → Actions → "New repository secret".
+#      Add GEMINI_API_KEY (a free key from https://aistudio.google.com/apikey).
+#      Optional: SHIPCHECK_EMAIL and SHIPCHECK_PASSWORD of a test account in your app.
+#   4. In GitHub: Actions → ShipCheck → "Run workflow".
+#
+# When it is done, open the run: the summary shows the verdict and the list of problems, and
+# the full report (report.html) is in the "shipcheck-report" artifact at the bottom of the page.
+#
+# Only test apps you own or have permission to test.
+
+name: ShipCheck
+
+on:
+  workflow_dispatch: # run it by hand from the Actions tab
+  # To also run it on every push to main, remove the "#" from the next three lines:
+  # push:
+  #   branches:
+  #     - main
+
+permissions:
+  contents: read
+
+jobs:
+  shipcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: Anjalipanwar/shipcheck@v0
+        with:
+          url: https://myapp.lovable.app
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+          email: ${{ secrets.SHIPCHECK_EMAIL }} # optional
+          password: ${{ secrets.SHIPCHECK_PASSWORD }} # optional
+          # More options (all optional):
+          # goal: 'book a 30-minute slot'  # the main task of your app, in plain English
+          # fail-on: major                 # blocker (default), major or none
+          # skip-mobile: true              # leave out the phone-sized pass
+          # no-ai: true                    # only the automatic checks; needs no key

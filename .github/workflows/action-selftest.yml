@@ -1,0 +1,101 @@
+name: Action self-test
+
+# Proves that the ShipCheck action (action.yml) works, by running it against the pretend app
+# with planted bugs. Automatic checks only: no AI key is used here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-selftest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Start the pretend app
+        run: |
+          nohup npm run fixture > fixture.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail --output /dev/null http://127.0.0.1:4173/; then exit 0; fi
+            sleep 1
+          done
+          cat fixture.log
+          exit 1
+
+      - name: 'ShipCheck action: problems are reported, the job is not failed (fail-on: none)'
+        id: lenient
+        uses: ./
+        with:
+          url: http://127.0.0.1:4173
+          no-ai: true
+          fail-on: none
+          out: report-lenient
+          artifact-name: shipcheck-report-lenient
+
+      - name: The report was written and the outputs are set
+        env:
+          VERDICT: ${{ steps.lenient.outputs.verdict }}
+          EXIT_CODE: ${{ steps.lenient.outputs.exit-code }}
+          REPORT_DIR: ${{ steps.lenient.outputs.report-dir }}
+        run: |
+          test -s report-lenient/report.html
+          test -s report-lenient/report.json
+          test -s report-lenient/report.md
+          test "$EXIT_CODE" = "0"
+          test "$REPORT_DIR" = "report-lenient"
+          test "$VERDICT" = "checks-found-issues"
+          grep -q "secret key" report-lenient/report.md
+
+      - name: 'ShipCheck action: a Blocker fails the step (default fail-on)'
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          url: http://127.0.0.1:4173
+          no-ai: true
+          skip-mobile: true
+          out: report-strict
+          artifact-name: shipcheck-report-strict
+
+      - name: The strict run failed with exit code 1 and still wrote its report
+        env:
+          OUTCOME: ${{ steps.strict.outcome }}
+          EXIT_CODE: ${{ steps.strict.outputs.exit-code }}
+        run: |
+          test "$OUTCOME" = "failure"
+          test "$EXIT_CODE" = "1"
+          test -s report-strict/report.html
+
+      - name: 'ShipCheck action: a full check without a key cannot run (exit code 2), nothing is written'
+        id: nokey
+        continue-on-error: true
+        uses: ./
+        with:
+          url: http://127.0.0.1:4173
+          out: report-nokey
+          artifact-name: shipcheck-report-nokey
+
+      - name: The run without a key stopped before testing
+        env:
+          OUTCOME: ${{ steps.nokey.outcome }}
+          EXIT_CODE: ${{ steps.nokey.outputs.exit-code }}
+        run: |
+          test "$OUTCOME" = "failure"
+          test "$EXIT_CODE" = "2"
+          test ! -e report-nokey

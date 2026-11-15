@@ -237,6 +237,37 @@ describe('the shipcheck command', () => {
     }
   });
 
+  it('on GitHub Actions (GITHUB_STEP_SUMMARY set) the short report is added to the run’s summary page', async () => {
+    const summary = join(dir, 'step-summary.md');
+    writeFileSync(summary, 'earlier step\n'); // other steps' text must stay
+    const { code } = await cli([app.url, ...quick], {
+      CI: 'true',
+      GITHUB_ACTIONS: 'true',
+      GITHUB_STEP_SUMMARY: summary,
+      SHIPCHECK_ARTIFACT_NAME: 'qa-report',
+      SHIPCHECK_EMAIL: 'demo@example.com',
+      SHIPCHECK_PASSWORD: 'Sup3r-Secret-Horse-77',
+    });
+    expect(code).toBe(1);
+    const text = readFileSync(summary, 'utf8');
+    expect(text.startsWith('earlier step\n')).toBe(true);
+    expect(text).toContain('## ShipCheck report');
+    expect(text).toMatch(/\| Severity \| Issue \| Area \| Device \|/);
+    expect(text).toMatch(/\| Blocker \| .+ \|/);
+    expect(text).toContain('`qa-report` artifact'); // the name the action uploads it under
+    expect(text).not.toContain('Sup3r-Secret-Horse-77');
+  });
+
+  it('a summary file that cannot be written does not fail the run', async () => {
+    const { code, output } = await cli([app.url, ...quick], {
+      CI: 'true',
+      GITHUB_STEP_SUMMARY: join(dir, 'no-such-folder', 'summary.md'),
+    });
+    expect(code).toBe(1);
+    expect(output).toContain('Report: ');
+    expect(output).not.toMatch(NO_STACK_TRACE);
+  });
+
   it('--help lists every flag and the settings file; --version prints the version; both exit 0', async () => {
     const help = await cli(['--help']);
     expect(help.code).toBe(0);

@@ -3,24 +3,24 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, M7 done (owner approved its two decisions); M8 started
-- **Next up:** M8 — GitHub Action (owner: "then go for M8", 2026-11-15). Waiting for the owner's result of the hand test of `--headed` and the report opening by itself (commands in the M7 section).
+- **Last updated:** 2026-11-15, M8 built locally (action, example, self-test workflow); not yet run on GitHub
+- **Next up:** owner's answer on pushing M8 (it is only "done" when the self-test workflow is green on GitHub, which needs a push — possibly more than one). Also waiting: the owner's hand test of `--headed` and the report opening by itself (commands in the M7 section).
 
 ## Overview
 
-| Milestone                                            | Status      | Commit                           | Pushed                                                      |
-| ---------------------------------------------------- | ----------- | -------------------------------- | ----------------------------------------------------------- |
-| M0 — Scaffold                                        | done        | `b59adfc`                        | yes                                                         |
-| M1 — Fixture app with planted bugs                   | done        | `2d605ba`                        | yes                                                         |
-| M2 — Browser session, evidence, deterministic checks | done        | `6498102`                        | yes                                                         |
-| M3 — Report renderer and verdict                     | done        | `8e0b406`                        | yes                                                         |
-| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63`                        | yes                                                         |
-| M5 — Mobile pass                                     | done        | `f168b9e`                        | yes                                                         |
-| M6 — AI judge, fix prompts, dedupe                   | done        | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
-| M7 — CLI polish                                      | done        | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
-| M8 — GitHub Action                                   | not started | —                                | —                                                           |
-| M9 — Docs and launch assets                          | not started | —                                | —                                                           |
-| M10 — Release                                        | not started | —                                | —                                                           |
+| Milestone                                            | Status                               | Commit                           | Pushed                                                      |
+| ---------------------------------------------------- | ------------------------------------ | -------------------------------- | ----------------------------------------------------------- |
+| M0 — Scaffold                                        | done                                 | `b59adfc`                        | yes                                                         |
+| M1 — Fixture app with planted bugs                   | done                                 | `2d605ba`                        | yes                                                         |
+| M2 — Browser session, evidence, deterministic checks | done                                 | `6498102`                        | yes                                                         |
+| M3 — Report renderer and verdict                     | done                                 | `8e0b406`                        | yes                                                         |
+| M4 — AI flows with Stagehand + safety guard          | done                                 | `f5f7e63`                        | yes                                                         |
+| M5 — Mobile pass                                     | done                                 | `f168b9e`                        | yes                                                         |
+| M6 — AI judge, fix prompts, dedupe                   | done                                 | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
+| M7 — CLI polish                                      | done                                 | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
+| M8 — GitHub Action                                   | built locally, not yet run on GitHub | see M8 section                   | no                                                          |
+| M9 — Docs and launch assets                          | not started                          | —                                | —                                                           |
+| M10 — Release                                        | not started                          | —                                | —                                                           |
 
 ## Standing instructions from the owner
 
@@ -412,6 +412,25 @@ The owner's own app (address and report kept outside this public repo, as agreed
 **Owner's answers (2026-11-15):** push the five commits and report CI time (done: green, 5 min 02 s and 5 min 10 s per job, browser tests about 4.5 minutes — under the 10 minutes above which the tests were to be split, so no split). Refusing `password` and `yes` in the settings file: approved. A dead app = exit code 1: approved. Terminal and report must always agree — fixed and tested (SPEC §13): "Hidden errors… not checked (your app did not open)" instead of "✓"; `test/e2e/progress-agrees.test.ts` compares progress lines and the coverage table in seven situations (found only this one disagreement). Then M8.
 
 **For the owner's hand test of `--headed` and the report opening by itself** (not covered by any automated test): `npm run fixture` starts the pretend app at http://127.0.0.1:4173 (new helper `test/helpers/serve-fixture.ts`); in a second terminal `npm run build && node dist/cli.js http://127.0.0.1:4173 --no-ai --headed`. Result: waiting for the owner.
+
+## M8 — GitHub Action
+
+- **Status:** built and tested locally; **not done** — the plan's condition is "the action runs green in this repo's CI", and that needs a push
+- **Commit:** see the overview table once pushed (local commit after `2ae567d`)
+- **Pushed:** no — to be asked
+
+**What was built**
+
+1. **`action.yml`** (composite): sets up Node 22, builds ShipCheck from the action's own files, installs Chromium, runs the check, uploads the report folder as an artifact (also when problems were found), sets outputs `verdict`, `exit-code`, `report-dir`. Inputs: `url`, `gemini-api-key`, `email`, `password` (SPEC §5.2) plus one for every other setting of the command, the two other AI keys and `artifact-name`. Decisions in SPEC §13 (2026-11-15 M8).
+2. **Run summary:** the command itself now adds the short report (verdict, coverage, issue table) to GitHub's run summary whenever `GITHUB_STEP_SUMMARY` is set (`src/step-summary.ts`). A summary file that cannot be written does not fail the run.
+3. **`examples/github-workflow.yml`:** the file users copy — started by hand, push trigger ready to switch on, secrets from repository secrets, four numbered steps in plain words.
+4. **`.github/workflows/action-selftest.yml`:** starts the pretend app (`npm run fixture`) and runs the action from this repository three times, automatic checks only, no key: lenient (`fail-on: none` → green, report files and outputs checked), strict (a Blocker must fail the step with exit code 1, report still written), and without a key (exit code 2, nothing written).
+
+**How it was verified (locally — GitHub Actions cannot run on a laptop):** typecheck and lint clean, 573 unit tests and 179 real-browser tests pass. `test/unit/action.test.ts` reads the action and workflow files: spec inputs present, an input for every flag of the command, nothing from the workflow pasted into a script, secrets only through the environment, the example uses only inputs that exist. `test/e2e/action-script.test.ts` runs the action's own "Run ShipCheck" script exactly as written against the fixture: exit codes 0, 1 and 2, outputs, report, run summary, hostile input values (quotes, `$( )`, backticks, `;`) run nothing, the password appears nowhere. Deliberate breakages, each failing a test: an input pasted into the script; ShipCheck's exit code not caught; the step always green; an input evaluated by the shell; the password passed as an argument. The versions of the three GitHub actions used (`checkout`, `setup-node`, `upload-artifact`, all v7) were read from their repositories.
+
+**Not verified:** anything that only GitHub can run — the composite steps as a whole (Node set-up, build inside the action's folder, Chromium install, artifact upload), and the self-test workflow itself. The example's `@v0` tag does not exist before M10.
+
+**Also in this stretch (M7 leftovers):** the terminal-versus-report test now also compares the grouped rows (basic security, flows on a phone); `--headed` was run once by me against the fixture (it ran through; a browser window showed briefly).
 
 ---
 

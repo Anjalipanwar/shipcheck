@@ -8,9 +8,18 @@ import { createScriptedDriver, type ScriptedOptions } from '../helpers/scripted-
 /**
  * The terminal and the report must always agree (owner decision 2026-11-15): a progress line
  * may only end in "✓" if the report's "What this report covers" table says that part was
- * tested. Lines for one part of a row made of several checks (basic security, the phone flows)
- * are compared by hand in other tests; every one-to-one line is compared here.
+ * tested. A row made of several checks (basic security, the flows on a phone) is compared as a
+ * group: "no problems found" needs a ✓ on every one of its lines, and a ✓ on every line needs a
+ * row that was tested.
  */
+const GROUPS: [CoverageArea, (label: string) => boolean][] = [
+  [
+    'security',
+    (label) =>
+      ['Secure connection (HTTPS)', 'Security settings', 'Exposed secret keys'].includes(label),
+  ],
+  ['phone-flows', (label) => /^(Signing up|Logging in|Main feature|Forms) on a phone$/.test(label)],
+];
 const AREA_OF: Record<string, CoverageArea> = {
   'Search engine basics (SEO)': 'seo',
   'Accessibility basics': 'accessibility',
@@ -34,6 +43,22 @@ function disagreements(progress: readonly string[], report: Report): string[] {
     if (result === '✓' && !tested) wrong.push(`“${line}” but the report says: ${row?.state}`);
     if (row?.state === 'no-problems' && result !== '✓')
       wrong.push(`“${line}” but the report says: no problems found`);
+  }
+  for (const [area, belongs] of GROUPS) {
+    const results = progress
+      .map((line) => line.split('… '))
+      .filter(([label = '']) => belongs(label))
+      .map(([, result = '']) => result);
+    if (results.length === 0) continue;
+    const row = report.coverage.find((entry) => entry.area === area);
+    const tested = row?.state === 'no-problems' || (row?.state === 'problems' && !row.partial);
+    const allTicks = results.every((result) => result === '✓');
+    if (allTicks && !tested)
+      wrong.push(`all ${area} lines show ✓ but the report says: ${row?.state}`);
+    if (row?.state === 'no-problems' && !allTicks)
+      wrong.push(
+        `the report says no problems in ${area}, but the lines say: ${results.join(', ')}`,
+      );
   }
   return wrong;
 }

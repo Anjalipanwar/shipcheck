@@ -1,0 +1,154 @@
+name: 'ShipCheck'
+description: "A QA engineer's pre-launch checkup for your vibe-coded app. Only test apps you own or have permission to test."
+author: 'Anjali Panwar'
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  url:
+    description: 'Address of the app to check, e.g. https://myapp.lovable.app'
+    required: true
+  gemini-api-key:
+    description: 'AI key from Google AI Studio (free). Pass it from a repository secret. Without any key, set no-ai to true.'
+    required: false
+    default: ''
+  anthropic-api-key:
+    description: 'Alternative AI key (Anthropic). Pass it from a repository secret.'
+    required: false
+    default: ''
+  openai-api-key:
+    description: 'Alternative AI key (OpenAI). Pass it from a repository secret.'
+    required: false
+    default: ''
+  email:
+    description: 'Email of a test account for the log-in check (optional). Pass it from a repository secret.'
+    required: false
+    default: ''
+  password:
+    description: 'Password of that test account (optional). Pass it from a repository secret — never write it into the workflow file.'
+    required: false
+    default: ''
+  goal:
+    description: 'The main task of your app in plain English, e.g. "book a 30-minute slot" (optional)'
+    required: false
+    default: ''
+  flows:
+    description: 'Comma-separated subset of: landing,signup,login,core,forms (default: all)'
+    required: false
+    default: ''
+  skip-mobile:
+    description: 'Set to true to skip the phone-sized pass'
+    required: false
+    default: 'false'
+  no-ai:
+    description: 'Set to true to run only the automatic checks, which need no AI key'
+    required: false
+    default: 'false'
+  model:
+    description: 'AI model id (default: chosen from the key you have set)'
+    required: false
+    default: ''
+  max-minutes:
+    description: 'Hard time budget in minutes (default: 10)'
+    required: false
+    default: ''
+  fail-on:
+    description: 'Fail the job when problems at this level are found: blocker, major or none (default: blocker)'
+    required: false
+    default: ''
+  out:
+    description: 'Folder for the report, inside your workspace'
+    required: false
+    default: 'shipcheck-report'
+  artifact-name:
+    description: 'Name of the uploaded report artifact. Change it if one job runs ShipCheck more than once.'
+    required: false
+    default: 'shipcheck-report'
+
+outputs:
+  verdict:
+    description: 'The verdict of the report (for example "ready" or "not-ready"); empty if ShipCheck could not run'
+    value: ${{ steps.run.outputs.verdict }}
+  exit-code:
+    description: '0 = passed the fail-on level, 1 = problems at or above it, 2 = ShipCheck itself could not run'
+    value: ${{ steps.run.outputs.exit-code }}
+  report-dir:
+    description: 'Folder the report was written to'
+    value: ${{ steps.run.outputs.report-dir }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: '22'
+
+    # ShipCheck is built from this action's own files, so nothing has to be published or
+    # downloaded from a package registry. A second run in the same job reuses the build.
+    - name: Prepare ShipCheck
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        if [ ! -f dist/cli.js ] || [ ! -d node_modules ]; then
+          npm ci --no-audit --no-fund
+          npm run build
+        fi
+        npx playwright install --with-deps chromium
+
+    # Everything the workflow passes in reaches the script as an environment variable — never
+    # as text pasted into the script. The password and the AI keys are not command-line
+    # arguments either: ShipCheck reads them from the environment.
+    - name: Run ShipCheck
+      id: run
+      shell: bash
+      env:
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_GOAL: ${{ inputs.goal }}
+        INPUT_FLOWS: ${{ inputs.flows }}
+        INPUT_SKIP_MOBILE: ${{ inputs.skip-mobile }}
+        INPUT_NO_AI: ${{ inputs.no-ai }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_MAX_MINUTES: ${{ inputs.max-minutes }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_OUT: ${{ inputs.out }}
+        GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        SHIPCHECK_EMAIL: ${{ inputs.email }}
+        SHIPCHECK_PASSWORD: ${{ inputs.password }}
+        SHIPCHECK_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        SHIPCHECK_CLI: ${{ github.action_path }}/dist/cli.js
+      run: |
+        args=("$INPUT_URL" --yes --out "$INPUT_OUT")
+        if [ -n "$INPUT_GOAL" ]; then args+=(--goal "$INPUT_GOAL"); fi
+        if [ -n "$INPUT_FLOWS" ]; then args+=(--flows "$INPUT_FLOWS"); fi
+        if [ -n "$INPUT_MODEL" ]; then args+=(--model "$INPUT_MODEL"); fi
+        if [ -n "$INPUT_MAX_MINUTES" ]; then args+=(--max-minutes "$INPUT_MAX_MINUTES"); fi
+        if [ -n "$INPUT_FAIL_ON" ]; then args+=(--fail-on "$INPUT_FAIL_ON"); fi
+        if [ "$INPUT_SKIP_MOBILE" = "true" ]; then args+=(--skip-mobile); fi
+        if [ "$INPUT_NO_AI" = "true" ]; then args+=(--no-ai); fi
+
+        code=0
+        node "$SHIPCHECK_CLI" "${args[@]}" || code=$?
+
+        verdict=""
+        if [ -f "$INPUT_OUT/report.json" ]; then
+          verdict=$(REPORT="$INPUT_OUT/report.json" node -e "console.log(JSON.parse(require('node:fs').readFileSync(process.env.REPORT, 'utf8')).verdict)")
+        fi
+        {
+          echo "verdict=$verdict"
+          echo "exit-code=$code"
+          echo "report-dir=$INPUT_OUT"
+        } >> "$GITHUB_OUTPUT"
+        exit "$code"
+
+    # Also when problems were found (the step above then fails): that is when the report matters.
+    - name: Upload the report
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.out }}
+        if-no-files-found: ignore

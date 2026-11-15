@@ -9,6 +9,7 @@ import { openReport } from './open-report.js';
 import { buildProgram, EXIT } from './program.js';
 import { writeReport } from './report/write.js';
 import { runShipCheck } from './runner.js';
+import { writeStepSummary } from './step-summary.js';
 import { summaryLines } from './summary.js';
 
 const print = (line = ''): void => void process.stdout.write(`${line}\n`);
@@ -31,6 +32,7 @@ async function run(urlArg: string, flags: Record<string, unknown>): Promise<numb
 
   const { report } = result;
   for (const line of summaryLines(report, written.htmlPath, result.llm)) print(line);
+  await writeStepSummary(report, process.env);
   await openReport(written.htmlPath, {
     env: process.env,
     interactive: process.stdout.isTTY === true,
