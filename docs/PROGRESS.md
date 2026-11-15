@@ -4,7 +4,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
 - **Last updated:** 2026-11-15, M5 follow-ups pushed
-- **Next up:** real-app run (`--no-ai` and AI) and a short summary for the owner, once the owner sends the app's address. **Do not start M6** until the owner says "go" (owner, 2026-11-15).
+- **Next up:** owner reviews the real-app summary. **Do not start M6** until the owner says "go" (owner, 2026-11-15). Recommended first: fix the password-in-report gap (lesson 3).
 
 ## Overview
 
@@ -291,6 +291,26 @@ Updated at the end of every milestone. Read this at the start of every session.
 **What was built:** the menu check runs on the start page and every page the phone pass opens (up to 5 more). Each menu gets a fingerprint — its button's label plus the link paths in its header (and in the panel it opens) — and each distinct menu is tapped once. A broken menu away from the start page says where: "The menu on /shop does not open on a phone".
 
 **How it was verified:** typecheck, lint, 446 unit tests, 114 real-browser tests pass. New full `--no-ai` run on a 5-page local site: one broken menu shared by 3 pages (one with the current page highlighted) → one finding and one tap; a second broken menu on `/shop` → its own finding naming `/shop`; a working menu on `/help` → "The menu opens on a phone"; exactly 3 taps in the action log. Switching the de-duplication off on purpose made the test fail. Bug #12: the dedicated test still starts on `/menu-broken.html`; the default run from `/` still never reaches it, and its finding list is unchanged.
+
+---
+
+## Real-app run before M6 (2026-11-15)
+
+The owner's own app (address and report kept outside this public repo, as agreed). Built CLI at `80c4376`, Gemini `gemini-3.5-flash-lite`.
+
+- `--no-ai`: 9 seconds, 3 Minor (missing security headers, no sitemap, pale text). Menu tapped once, header shared by 6 pages.
+- With AI: 128 seconds, **42 of 150 AI calls** (landing 1, signup 4, login 4, core 10, forms 5, mobile 18). Verdict "Not ready": 2 Blocker, 2 Major, 3 Minor.
+- **Checked against the screenshots: all 2 Blockers and both Majors are false alarms.** The 3 Minors look real.
+
+**Lessons for M6 (general, no app details)**
+
+1. **Judged too early.** Sign-up worked (both screenshots show the signed-in dashboard), but the observation read a half-drawn loading label ("…ing…") and the address before the redirect → "New users cannot sign up" (Blocker). Needs: wait until the page settles; no Blocker when the screenshot contradicts the text.
+2. **Analytics counted as "the server accepted the form".** A hosting platform's tracking beacon (a same-site POST answered 202) was taken as the form submission, while the page showed its own "Please enter your name" and the browser's "include an @" message → two false Majors. Needs: only the form's own request counts; a visible validation message overrides.
+3. **The main-feature flow signed up by itself with invented details** ("user@example.com" and a made-up password). The app correctly refused the weak password → false Blocker. **The made-up password was written into report.html, report.md and report.json** — a SPEC §7.6 gap: only known passwords are scrubbed. Needs a fix before M6: flows never invent credentials; scrub every typed password field value.
+4. **Clear misses.** Logging in with the right password was not tested (it relied on the "failed" sign-up), the main feature was never tried (desktop: the AI service answered "too many requests" after ~40 calls in 2 minutes — no retry or slow-down), and log-in on a phone was "not tested" with the wrong reason ("only Google sign-in?") — the log-in link sits behind the phone menu.
+5. Small: "Get started … leads somewhere" listed twice under what worked; "a problem that make" grammar in the accessibility finding.
+
+**Side effects on the owner's app:** two test accounts (`shipcheck+…@example.com`, desktop and phone sign-up) and one contact-form message with test text. The invalid and empty submissions were stopped by the app's own checks.
 
 ---
 
