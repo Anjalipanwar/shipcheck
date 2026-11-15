@@ -16,6 +16,7 @@ import { createScriptedDriver } from '../helpers/scripted-driver.js';
  * ones ShipCheck creates for its own test sign-ups, and not one the AI makes up by itself.
  */
 const INVENTED = 'Zebra-Lamp-4471!';
+const SHORT = 'q7';
 
 /** A scripted "AI" that, in the main-feature flow, goes to the log-in page and makes up a password. */
 const inventsPassword = (page: Page, done: number): ProposedAction[] => {
@@ -31,6 +32,17 @@ const inventsPassword = (page: Page, done: number): ProposedAction[] => {
     ];
   }
   if (path !== '/login.html' || done > 3) return [];
+  if (done >= 2) {
+    // …and then a very short one: too short to scrub from all text, but never shown as typed.
+    return [
+      {
+        selector: 'xpath=//*[@id="login-password"]',
+        description: 'Password field',
+        method: 'fill',
+        arguments: [SHORT],
+      },
+    ];
+  }
   return [
     {
       selector: 'xpath=//*[@id="login-password"]',
@@ -87,10 +99,20 @@ describe('passwords never reach any output', () => {
         ['progress lines', progress.join('\n')],
       ];
       for (const [name, text] of outputs) {
-        for (const password of typed) {
+        for (const password of typed.filter((value) => value.length >= 4)) {
           expect(text.includes(password), `${name} contains a password`).toBe(false);
         }
       }
+      // Whatever was typed into a password field is shown as hidden, whatever its length.
+      expect(typed).toContain(SHORT);
+      const passwordSteps = result.report.actionLog.filter(
+        (entry) => entry.action === 'fill' && /password/.test(entry.locator ?? ''),
+      );
+      expect(passwordSteps.length).toBeGreaterThanOrEqual(4);
+      expect(new Set(passwordSteps.map((entry) => entry.value))).toEqual(new Set(['[hidden]']));
+      const json = outputs.find(([name]) => name === 'report.json')?.[1] ?? '';
+      expect(json).not.toContain(`"${SHORT}"`);
+      expect(json).not.toContain(`“${SHORT}”`);
       // The step itself is still on record — with the value hidden.
       expect(
         result.report.actionLog.some(

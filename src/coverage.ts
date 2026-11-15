@@ -17,7 +17,7 @@ import {
 
 /** What the runner knows about an area before findings are counted. */
 export interface Outcome {
-  state: 'tested' | 'not-tested' | 'skipped' | 'absent';
+  state: 'tested' | 'not-tested' | 'skipped' | 'absent' | 'payment-stop';
   /** Why — for "not-tested" it ends with what the user can do. */
   note?: string | undefined;
 }
@@ -73,7 +73,7 @@ export class CoverageRecorder {
   }
 }
 
-/** Several outcomes for one area: blocked beats tested beats skipped beats absent. */
+/** Several outcomes for one area: blocked beats a payment stop beats tested beats skipped beats absent. */
 export function combine(outcomes: readonly Outcome[]): Outcome {
   const blocked = outcomes.filter((o) => o.state === 'not-tested');
   if (blocked.length > 0) {
@@ -81,6 +81,7 @@ export function combine(outcomes: readonly Outcome[]): Outcome {
     return { state: 'not-tested', ...(notes.length > 0 ? { note: notes.join(' ') } : {}) };
   }
   return (
+    outcomes.find((o) => o.state === 'payment-stop') ??
     outcomes.find((o) => o.state === 'tested') ??
     outcomes.find((o) => o.state === 'skipped') ??
     outcomes[0] ?? { state: 'not-tested' }
@@ -103,13 +104,14 @@ const gapNote = (gap: Gap): string =>
 /**
  * What became of one flow. Blocked (email confirmation, CAPTCHA, a limit, an error…) → not
  * tested; left out by the user's choice → skipped; the app has no such part → absent; otherwise
- * tested — also when it found a bug.
+ * tested — also when it found a bug. Stopping before a payment is its own, neutral outcome.
  */
 export function flowOutcome(result: FlowResult): Outcome {
   const blocked = result.gaps.filter((gap) => gap.kind === 'blocked');
   if (blocked.length > 0) {
     return { state: 'not-tested', note: [...new Set(blocked.map(gapNote))].join(' ') };
   }
+  if (result.gaps.some((gap) => gap.kind === 'payment')) return { state: 'payment-stop' };
   if (result.status !== 'completed') {
     return { state: 'not-tested', note: withAdvice('this part could not finish', ADVICE.retry) };
   }

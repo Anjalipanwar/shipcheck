@@ -26,7 +26,17 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
 const NOT_USED_AS_VISITOR = 'ShipCheck did not use your app like a visitor';
 
 /** The sentence under the verdict. Neutral verdicts still say plainly when a Blocker was found. */
-export function verdictSummary(report: Pick<Report, 'verdict' | 'counts'>): string {
+export function verdictSummary(report: Pick<Report, 'verdict' | 'counts' | 'findings'>): string {
+  const paid = report.findings.some((finding) => finding.rule === REACHED_PAYMENT_RULE);
+  return paid ? `${verdictText(report)} ${NEVER_PAYS}` : verdictText(report);
+}
+
+/** Added to the verdict text whenever a flow reached a payment step and stopped there. */
+export const NEVER_PAYS =
+  'ShipCheck never pays. Test your payment yourself with a test card before you launch.';
+export const REACHED_PAYMENT_RULE = 'coverage/reached-payment';
+
+function verdictText(report: Pick<Report, 'verdict' | 'counts'>): string {
   switch (report.verdict) {
     case 'ready':
       return 'ShipCheck found nothing that should stop you from launching.';
@@ -143,7 +153,8 @@ export const NEEDS_FULL_CHECK = 'this needs the full check';
 /** What the user can do about a "not tested" area. Every such reason ends with one of these. */
 export const ADVICE = {
   quota: 'Try again tomorrow, or use a paid key',
-  calls: 'Run ShipCheck again with fewer parts at a time, for example --flows core',
+  calls:
+    'This check was too big for one run. Check fewer parts at a time: run ShipCheck again with --flows core',
   time: 'Run ShipCheck again with a higher --max-minutes',
   account: 'Add a test account (see the README)',
   goal: 'Describe the main task with --goal "…"',
@@ -161,6 +172,7 @@ export const STATE_ICON: Record<CoverageState, string> = {
   'not-tested': '○',
   skipped: '—',
   absent: '—',
+  'payment-stop': '—',
 };
 
 /** The words next to the icon. Reasons and next steps are added by `stateNote`. */
@@ -176,6 +188,8 @@ export function stateText(entry: CoverageEntry): string {
       return entry.note ? `Skipped by your choice: ${entry.note}` : 'Skipped by your choice';
     case 'absent':
       return entry.note ? `Not in your app: ${entry.note}` : 'Not in your app';
+    case 'payment-stop':
+      return 'Stopped before payment (by design)';
   }
 }
 
@@ -201,12 +215,14 @@ export function coverageLine(report: Pick<Report, 'meta' | 'coverage'>): string 
   const untested = names(['not-tested']);
   const skipped = names(['skipped']);
   const absent = names(['absent']);
+  const payment = names(['payment-stop']);
   const parts = [
     `${count(fine, 'area', 'areas')} without problems`,
     ...(problems.length > 0 ? [`problems in: ${problems.join(', ')}`] : []),
     ...(untested.length > 0 ? [`not tested: ${untested.join(', ')}`] : []),
     ...(skipped.length > 0 ? [`skipped by your choice: ${skipped.join(', ')}`] : []),
     ...(absent.length > 0 ? [`not in your app: ${absent.join(', ')}`] : []),
+    ...(payment.length > 0 ? [`stopped before payment (by design): ${payment.join(', ')}`] : []),
   ];
   return `${COVERAGE_TITLE}: ${CHECK_TYPE_LABEL[report.meta.mode]} — ${parts.join('; ')}.`;
 }

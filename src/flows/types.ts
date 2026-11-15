@@ -49,7 +49,7 @@ export interface Observation {
  * - absent: the app has no such part (e.g. no sign-up page).
  */
 export interface Gap {
-  kind: 'blocked' | 'choice' | 'absent';
+  kind: 'blocked' | 'choice' | 'absent' | 'payment';
   /** Short reason in plain words. */
   reason: string;
   /** blocked only: what the user can do about it. */

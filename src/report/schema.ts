@@ -57,6 +57,8 @@ export const CoverageStateSchema = z.enum([
   'not-tested',
   'skipped',
   'absent',
+  /** The flow reached a payment step and stopped there, as designed (SPEC §7.2). */
+  'payment-stop',
 ]);
 export const CoverageEntrySchema = z.object({
   area: CoverageAreaSchema,

@@ -142,6 +142,27 @@ describe('the box in report.html', () => {
     expect(coverageBox(full())).not.toContain('class="other"');
   });
 
+  it('“Stopped before payment (by design)” is neutral: it does not block “Ready to launch”, and the verdict adds the reminder', () => {
+    const note = finding({
+      severity: 'info',
+      rule: 'coverage/reached-payment',
+      category: 'coverage',
+      flow: 'core',
+    });
+    const paid = full({ core: { state: 'payment-stop' } }, [note]);
+    expect(paid.verdict).toBe('ready');
+    expect(coverageBox(paid)).toContain(
+      '<tr class="st-payment-stop"><th scope="row">Main feature</th><td><span class="icon" aria-hidden="true">—</span> <span class="state">Stopped before payment (by design)</span>',
+    );
+    const reminder =
+      'ShipCheck never pays. Test your payment yourself with a test card before you launch.';
+    for (const text of [renderHtml(paid), renderMarkdown(paid), renderStepSummary(paid)]) {
+      expect(text).toContain(`nothing that should stop you from launching. ${reminder}`);
+    }
+    expect(coverageLine(paid)).toContain('stopped before payment (by design): Main feature');
+    expect(renderHtml(full())).not.toContain('ShipCheck never pays');
+  });
+
   it('problems in an area that was also blocked: both are shown', () => {
     const partial = full({ login: 'no test account. Add a test account (see the README).' }, [
       finding({ severity: 'major', flow: 'login', rule: 'login/x' }),

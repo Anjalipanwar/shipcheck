@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ProposedAction } from '../../src/browser/guard.js';
 import { loadConfig } from '../../src/config.js';
 import { isUntested, ReportSchema, type Report } from '../../src/report/schema.js';
+import { verdictSummary } from '../../src/report/present.js';
 import { runShipCheck, type RunResult } from '../../src/runner.js';
 import { createScriptedDriver } from '../helpers/scripted-driver.js';
 import { DEMO_ACCOUNT, startFixtureServer, type FixtureServer } from '../helpers/fixture-server.js';
@@ -358,6 +359,12 @@ describe('a misbehaving AI that goes for the traps', () => {
         expect(report.notTested.join('\n')).toMatch(
           /reached the payment step and stopped before paying/,
         );
+        // By design, so neutral: not "Not tested", and the verdict text carries the reminder.
+        expect(report.coverage.find((e) => e.area === 'core')).toEqual({
+          area: 'core',
+          state: 'payment-stop',
+        });
+        expect(verdictSummary(report)).toContain('ShipCheck never pays.');
       } finally {
         await app.close();
       }
@@ -424,7 +431,7 @@ describe('budgets', () => {
       // Coverage says exactly that: user areas ✗ with the reason, automatic areas ✓.
       const covered = coverageOf(result.report);
       const limit =
-        'not-tested: the limit of 4 AI calls for one run was reached. Run ShipCheck again with fewer parts at a time, for example --flows core.';
+        'not-tested: the limit of 4 AI calls for one run was reached. This check was too big for one run. Check fewer parts at a time: run ShipCheck again with --flows core.';
       expect(covered.core).toBe(limit);
       expect(covered.forms).toBe(limit);
       expect(covered['phone-flows']).toMatch(/^not-tested: /);
@@ -458,7 +465,7 @@ describe('budgets', () => {
       expect(result.report.meta.partial).toBe(true);
       const covered = coverageOf(result.report);
       expect(covered['phone-flows']).toBe(
-        'not-tested: Landing page, Sign-up, Log-in, Main feature: ShipCheck reached its limit of 20 AI calls for one run. Run ShipCheck again with fewer parts at a time, for example --flows core.',
+        'not-tested: Landing page, Sign-up, Log-in, Main feature: ShipCheck reached its limit of 20 AI calls for one run. This check was too big for one run. Check fewer parts at a time: run ShipCheck again with --flows core.',
       );
       expect(covered['phone-layout']).toBe('✓');
       expect(rules(result.report)).toContain('mobile/sideways-scroll');

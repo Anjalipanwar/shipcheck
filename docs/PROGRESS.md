@@ -339,14 +339,15 @@ The owner's own app (address and report kept outside this public repo, as agreed
 - Problems that belong to no row (page speed, a dead button on the home page, a home page that does not load) are mentioned in one line under the table, so the box never looks cleaner than the counts.
 - The report is scrubbed of passwords before the runner returns it, so the terminal and step summary are covered too, not only the written files.
 
-**Choices made where the decisions left room (still open — the owner has not answered yet)**
+**Owner's answers on the open choices (2026-11-15) — built and committed**
 
-- Plurals: "2 Blockers", but "4 Major", "7 Minor", "1 Info" stay (describing words).
-- Log-in / sign-up is "Not in your app" only when neither a link nor a form is found on desktop.
-- A flow stopped at a payment step counts as "Not tested".
-- AI-call-limit advice: "Run ShipCheck again with fewer parts at a time, for example --flows core" (there is no flag to raise the limit).
-- Passwords shorter than 4 characters are not scrubbed.
-- Still true until M9/M10: the `npx @anjalipanwar/shipcheck …` command works only after the npm release, and the README sections the report points to (`#get-a-free-ai-key`, test accounts) are written in M9.
+- Plurals and the "Not in your app" rule: approved as built.
+- Payment: not "Not tested" but a neutral state "Stopped before payment (by design)" that does not block "Ready to launch"; the verdict text then adds "ShipCheck never pays. Test your payment yourself with a test card before you launch."
+- AI-call-limit advice: "This check was too big for one run. Check fewer parts at a time: run ShipCheck again with --flows core".
+- Short passwords: text scrubbing keeps the 4-character minimum; a field where ShipCheck typed a password always shows "[hidden]" (tested with a 2-character password).
+- Real-key runs approved: one on the fixture for M6; after M6 one re-run on the owner's app (summary only, nothing about it in the repo).
+- Still true until M9/M10: the `npx @anjalipanwar/shipcheck …` command works only after the npm release, and the README sections the report points to are written in M9.
+- **Not yet answered:** push of `78eb04b` and the commit after it.
 
 ---
 

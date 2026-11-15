@@ -49,7 +49,7 @@ p{margin:0 0 10px}
 .cov tr.group th{padding-top:16px;border-top:0;font-weight:700;font-size:.92rem;color:var(--muted)}
 .cov .icon{display:inline-block;width:1.3em;font-weight:800}
 .cov .st-no-problems .icon,.cov .st-no-problems .state{color:var(--ok-fg)}
-.cov .st-not-tested td,.cov .st-skipped td,.cov .st-absent td{color:var(--muted)}
+.cov .st-not-tested td,.cov .st-skipped td,.cov .st-absent td,.cov .st-payment-stop td{color:var(--muted)}
 .cov .s-blocker .icon,.cov .s-blocker .state a{color:var(--blocker-fg)}
 .cov .s-major .icon,.cov .s-major .state a{color:var(--major-fg)}
 .cov .s-minor .icon,.cov .s-minor .state a{color:var(--minor-fg)}

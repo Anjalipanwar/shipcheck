@@ -88,6 +88,15 @@ describe('flowOutcome', () => {
       flowOutcome(flow({ gaps: [{ kind: 'absent', reason: 'no sign-up page was found' }] })),
     ).toEqual({ state: 'absent', note: 'no sign-up page was found' });
   });
+  it('stopped before a payment (by design) → its own neutral outcome, not "not tested"', () => {
+    expect(
+      flowOutcome(
+        flow({ status: 'stopped', gaps: [{ kind: 'payment', reason: 'stopped before payment' }] }),
+      ),
+    ).toEqual({ state: 'payment-stop' });
+    expect(combine([{ state: 'tested' }, { state: 'payment-stop' }]).state).toBe('payment-stop');
+    expect(combine([{ state: 'payment-stop' }, { state: 'not-tested' }]).state).toBe('not-tested');
+  });
   it('blocked wins over choice and absent; a crash is not tested', () => {
     expect(
       flowOutcome(

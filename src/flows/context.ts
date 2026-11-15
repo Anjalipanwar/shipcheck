@@ -397,7 +397,13 @@ export async function runFlow(name: FlowName, deps: FlowDeps, body: FlowBody): P
   } catch (error) {
     await ctx.shot('stopped').catch(() => undefined);
     if (error instanceof StopFlow) {
-      ctx.skip(error.note, { action: STOP_ADVICE[error.reason](error.note) });
+      // Stopping before a payment is by design, not a gap in the test (owner decision 2026-11-15).
+      ctx.skip(
+        error.note,
+        error.reason === 'payment'
+          ? { kind: 'payment', reason: 'stopped before payment' }
+          : { action: STOP_ADVICE[error.reason](error.note) },
+      );
       return ctx.result('stopped');
     }
     ctx.skip(`${ctx.label} — this part of the test could not finish`, { action: ADVICE.retry });
