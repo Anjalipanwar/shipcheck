@@ -34,7 +34,21 @@ const FIND_TOGGLE = `(() => {
   if (!toggle) return null;
   const label = (toggle.getAttribute('aria-label') || toggle.innerText || toggle.getAttribute('title') || 'menu button')
     .replace(/\\s+/g, ' ').trim().slice(0, 60);
-  return { selector: 'xpath=' + xpathOf(toggle), label };
+  // Same header = same menu: the button's label plus the link paths in its header (and in the
+  // panel it controls). Paths, not texts, so a highlighted "current page" link changes nothing.
+  const scope = toggle.closest('header, [role="banner"]') ||
+    toggle.closest('nav, [role="navigation"]') || document.body;
+  const controlled = toggle.getAttribute('aria-controls')
+    ? document.getElementById(toggle.getAttribute('aria-controls')) : null;
+  const paths = new Set();
+  for (const root of [scope, controlled]) {
+    if (!root) continue;
+    for (const link of root.querySelectorAll('a[href]')) {
+      try { paths.add(new URL(link.href).pathname); } catch (error) { /* ignore odd links */ }
+    }
+  }
+  return { selector: 'xpath=' + xpathOf(toggle), label,
+    signature: label.toLowerCase() + '|' + [...paths].sort().join(',') };
 })()`;
 
 /** How many links and buttons a visitor can see right now. */
@@ -47,19 +61,30 @@ const COUNT_VISIBLE = `(() => [...document.querySelectorAll('a[href], button, [r
       box.bottom > 0 && box.right > 0 && box.left < innerWidth;
   }).length)()`;
 
-const ToggleSchema = z.object({ selector: z.string(), label: z.string() }).nullable();
+const ToggleSchema = z
+  .object({ selector: z.string(), label: z.string(), signature: z.string() })
+  .nullable();
 
 export interface MenuCheckOptions {
   device: DeviceName;
   evidence: Evidence;
   /** Test-only switch, as in flows: production code never turns the guard off. */
   guardEnabled?: boolean;
+  /**
+   * Menus already checked on earlier pages of this run (their fingerprints). A menu found here
+   * again is skipped; a new one is added after it is checked.
+   */
+  seen?: Set<string>;
+  /** Set when this is not the page the run started on: named in the finding's title. */
+  pagePath?: string;
 }
 
 export async function checkPhoneMenu(page: Page, options: MenuCheckOptions): Promise<CheckResult> {
   const none: CheckResult = { findings: [], passed: [], notTested: [] };
   const toggle = ToggleSchema.parse(await page.evaluate(FIND_TOGGLE));
   if (!toggle) return none; // No menu button: the menu links are shown directly (or there are none).
+  if (options.seen?.has(toggle.signature)) return none; // same header as an earlier page
+  options.seen?.add(toggle.signature);
 
   const action: ProposedAction = {
     selector: toggle.selector,
@@ -113,7 +138,9 @@ export async function checkPhoneMenu(page: Page, options: MenuCheckOptions): Pro
     findings: [
       makeFinding({
         rule: 'mobile/menu-does-not-open',
-        title: 'The menu does not open on a phone',
+        title: options.pagePath
+          ? `The menu on ${options.pagePath} does not open on a phone`
+          : 'The menu does not open on a phone',
         severity: 'major',
         category: 'mobile',
         flow: 'mobile',

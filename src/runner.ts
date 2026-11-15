@@ -562,7 +562,7 @@ const facts = (landing: Landing): PageFacts => landing.facts;
 /**
  * Phone layout checks: the home page and up to five pages linked from it (menu and main buttons
  * first), each opened at iPhone size. A banner covering a button is closed once with a safe
- * choice, if it has one. The menu button is tapped once, on the home page only.
+ * choice, if it has one. Each distinct menu button (same header = same menu) is tapped once.
  */
 async function phoneLayout(
   phone: DevicePage,
@@ -595,7 +595,8 @@ async function phoneLayout(
     }
 
     const checked: CheckedPage[] = [];
-    let menu: CheckResult = { findings: [], passed: [], notTested: [] };
+    const menu: CheckResult = { findings: [], passed: [], notTested: [] };
+    const menusSeen = new Set<string>();
     for (const url of [homeUrl, ...extra]) {
       let status: number | null = null;
       try {
@@ -629,12 +630,18 @@ async function phoneLayout(
             })
           : pageFacts;
       checked.push({ facts: judged, ...(shot ? { screenshot: shot.file } : {}) });
-      if (url === homeUrl) {
-        menu = await checkPhoneMenu(phone.page, {
-          device: 'mobile',
-          evidence,
-          ...(options.guardEnabled === false ? { guardEnabled: false } : {}),
-        });
+      // Every visited page, but each distinct menu (same header = same menu) only once.
+      const result = await checkPhoneMenu(phone.page, {
+        device: 'mobile',
+        evidence,
+        seen: menusSeen,
+        ...(url === homeUrl ? {} : { pagePath: new URL(url).pathname }),
+        ...(options.guardEnabled === false ? { guardEnabled: false } : {}),
+      });
+      menu.findings.push(...result.findings);
+      for (const line of result.passed) if (!menu.passed.includes(line)) menu.passed.push(line);
+      for (const line of result.notTested) {
+        if (!menu.notTested.includes(line)) menu.notTested.push(line);
       }
     }
     const layout = judgeLayout(checked);

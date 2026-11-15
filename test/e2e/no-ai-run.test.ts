@@ -313,6 +313,63 @@ describe('planted bug #12 — runs started on the menu pages (they are not linke
   });
 });
 
+/** Serves a few synthetic pages on a random local port for one test. */
+async function serve(pages: Record<string, string>): Promise<{ url: string; close: () => void }> {
+  const server = createServer((req, res) => {
+    const body = pages[(req.url ?? '/').split('?')[0] ?? '/'];
+    res
+      .writeHead(body ? 200 : 404, { 'content-type': 'text/html; charset=utf-8' })
+      .end(body ?? 'Not found');
+  });
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  const { port } = server.address() as AddressInfo;
+  return { url: `http://127.0.0.1:${port}`, close: () => server.close() };
+}
+
+describe('menu check on every phone page, each distinct menu once (owner decision 2026-11-15)', () => {
+  /** A header whose phone menu opens only if `works`; links are shown directly on a desktop. */
+  const header = (label: string, links: string[], works: boolean, current = '') => `
+    <header><a href="/">Home</a>
+      <button class="toggle" aria-label="${label}" aria-expanded="false" aria-controls="m">☰</button>
+      <nav id="m">${links.map((l) => `<a href="${l}"${l === current ? ' aria-current="page"' : ''}>${l.slice(1)}</a>`).join('')}</nav>
+    </header>${works ? `<script>document.querySelector('.toggle').onclick = () => document.getElementById('m').classList.add('open');</script>` : ''}`;
+  const page = (title: string, head: string) =>
+    `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
+     <style>body{margin:0;font:16px sans-serif}header a,.toggle{display:inline-block;min-width:48px;min-height:48px;padding:12px}
+     .toggle{display:none}@media (max-width:767px){.toggle{display:inline-block}#m{display:none}#m.open{display:block}}</style></head>
+     <body>${head}<main><h1>${title}</h1></main></body></html>`;
+  const SITE = ['/about', '/shop', '/help', '/contact'];
+
+  it('one broken menu on four pages → one finding; another broken menu → its own finding naming its page', async () => {
+    const site = await serve({
+      '/': page('Home', header('Menu', SITE, false)),
+      '/about': page('About', header('Menu', SITE, false, '/about')), // same header, current page marked
+      '/contact': page('Contact', header('Menu', SITE, false, '/contact')),
+      '/shop': page('Shop', header('Open navigation', ['/cart-help', '/returns'], false)),
+      '/help': page('Help', header('Help menu', ['/faq'], true)),
+    });
+    try {
+      const { report } = await runShipCheck(
+        loadConfig(`${site.url}/`, { ai: false, yes: true }, {}),
+      );
+      const menus = report.findings.filter((f) => f.rule === 'mobile/menu-does-not-open');
+      expect(menus.map((f) => [f.title, f.severity, f.evidence.url])).toEqual([
+        ['The menu does not open on a phone', 'major', `${site.url}/`],
+        ['The menu on /shop does not open on a phone', 'major', `${site.url}/shop`],
+      ]);
+      expect(report.passed).toContain('The menu opens on a phone');
+      const taps = report.actionLog.filter((a) => a.intent.startsWith('Tap the menu button'));
+      expect(taps.map((a) => [a.intent, new URL(a.url ?? '').pathname])).toEqual([
+        ['Tap the menu button “Menu”', '/'],
+        ['Tap the menu button “Open navigation”', '/shop'],
+        ['Tap the menu button “Help menu”', '/help'],
+      ]);
+    } finally {
+      site.close();
+    }
+  });
+});
+
 describe('covered button in a full run (owner decision 2026-11-15)', () => {
   it('a closable cookie banner → Minor “covers … until it’s closed”, screenshot taken with the banner', async () => {
     const html = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Banner</title>

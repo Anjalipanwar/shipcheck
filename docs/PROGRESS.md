@@ -257,6 +257,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 4. Menu check: existing fixture pages stay unchanged; two new pages, one working menu (must not be reported) and one broken (planted bug #12). BUGS.md updated.
 5. Before M6: run ShipCheck (`--no-ai` and AI) on the owner's real app and send a short summary (findings, likely false alarms, clear misses, AI calls). Wait for "go" on M6 after that.
 6. 2026-11-15: push the follow-up commits — done. "Don't start M6 yet."
+7. 2026-11-15: run the menu check on every page the phone pass visits (up to 5), each distinct menu once (same header = same menu); keep bug #12 out of the default run, with a dedicated test starting on `/menu-broken.html`. Privacy approach for the real-app run approved; app address given. Wait for "go" on M6 after the real-app run.
 
 **What was built**
 
@@ -276,8 +277,20 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 **Open questions**
 
-- Bug #12 only shows in a run started on its own page. Should the menu check also run on the other pages of the phone pass (up to 5), not just the start page?
-- Real-app run: needs the app's address and the owner's confirmation that they own it or may test it. The AI run would create a `shipcheck+…@example.com` account on the live app unless the owner puts a test account in `.env` (`SHIPCHECK_EMAIL` / `SHIPCHECK_PASSWORD`). The repo is public: the real-app report and address stay outside it; only the fact of the run and the AI call count go into this file.
+- ~~Menu check on the other phone pages too?~~ Answered 2026-11-15: yes, each distinct menu once (see "Menu check on every phone page" below).
+- ~~Real-app run: needs the app's address.~~ Given 2026-11-15 (kept out of this public file); privacy approach approved. The AI run would create a `shipcheck+…@example.com` account on the live app unless the owner puts a test account in `.env` (`SHIPCHECK_EMAIL` / `SHIPCHECK_PASSWORD`). The repo is public: the real-app report and address stay outside it; only the fact of the run and the AI call count go into this file.
+
+---
+
+## Menu check on every phone page (owner decision of 2026-11-15)
+
+- **Status:** done
+- **Commit:** see the next progress-log commit
+- **Pushed:** no — waiting for the owner's answer
+
+**What was built:** the menu check runs on the start page and every page the phone pass opens (up to 5 more). Each menu gets a fingerprint — its button's label plus the link paths in its header (and in the panel it opens) — and each distinct menu is tapped once. A broken menu away from the start page says where: "The menu on /shop does not open on a phone".
+
+**How it was verified:** typecheck, lint, 446 unit tests, 114 real-browser tests pass. New full `--no-ai` run on a 5-page local site: one broken menu shared by 3 pages (one with the current page highlighted) → one finding and one tap; a second broken menu on `/shop` → its own finding naming `/shop`; a working menu on `/help` → "The menu opens on a phone"; exactly 3 taps in the action log. Switching the de-duplication off on purpose made the test fail. Bug #12: the dedicated test still starts on `/menu-broken.html`; the default run from `/` still never reaches it, and its finding list is unchanged.
 
 ---
 
