@@ -285,7 +285,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 ## Menu check on every phone page (owner decision of 2026-11-15)
 
 - **Status:** done
-- **Commit:** see the next progress-log commit
+- **Commit:** `8bc6084`
 - **Pushed:** no — waiting for the owner's answer
 
 **What was built:** the menu check runs on the start page and every page the phone pass opens (up to 5 more). Each menu gets a fingerprint — its button's label plus the link paths in its header (and in the panel it opens) — and each distinct menu is tapped once. A broken menu away from the start page says where: "The menu on /shop does not open on a phone".
