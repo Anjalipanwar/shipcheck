@@ -64,7 +64,8 @@ describe('action.yml (SPEC §5.2)', () => {
 
 describe('examples/github-workflow.yml (the file users copy)', () => {
   it('uses the published action with inputs that exist, and takes secrets from repository secrets', () => {
-    const used = withOf(example, 'Anjalipanwar/shipcheck@v0');
+    // @main until the v0 tag exists (M10 checklist in docs/BUILD_PLAN.md: switch to @v0 then).
+    const used = withOf(example, 'Anjalipanwar/shipcheck@main');
     expect(Object.keys(used)).toEqual(['url', 'gemini-api-key', 'email', 'password']);
     for (const name of Object.keys(used)) expect(actionInputs(action)).toContain(name);
     expect(used['gemini-api-key']).toContain('${{ secrets.GEMINI_API_KEY }}');

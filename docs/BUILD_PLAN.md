@@ -69,6 +69,7 @@ Estimated total: ~2 focused days. Times are rough guides, not limits.
 ## M10 — Release (≈1h, owner involved)
 - `npm pack` dry run, check package contents/size. Owner runs `npm login` + `npm publish --access public`.
 - Tag `v0.1.0` and move `v0` tag; GitHub release notes from CHANGELOG.
+- **Switch from `@main` to `@v0` (owner decision 2026-11-15):** once the `v0` tag exists, change `Anjalipanwar/shipcheck@main` to `Anjalipanwar/shipcheck@v0` in `examples/github-workflow.yml` and in the README (and the expected value in `test/unit/action.test.ts`), then test the example against the tag: copy it into a workflow, run it, and check the summary and the artifact.
 - Re-check the M9 list after publishing: the full-check command printed in reports (`npx @anjalipanwar/shipcheck <url>`) runs from a clean machine, and the report's links open.
 - **Done when:** `npx @anjalipanwar/shipcheck --help` works from a clean machine.
 
