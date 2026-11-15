@@ -17,7 +17,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M4 — AI flows with Stagehand + safety guard          | done                        | `f5f7e63`             | yes                                   |
 | M5 — Mobile pass                                     | done                        | `f168b9e`             | yes                                   |
 | M6 — AI judge, fix prompts, dedupe                   | done                        | `c2c651a` … `6403dbc` | up to `fc928dc` yes; later commits no |
-| M7 — CLI polish                                      | built, owner review pending | see M7 section        | no                                    |
+| M7 — CLI polish                                      | built, owner review pending | `951404c` + follow-up | no                                    |
 | M8 — GitHub Action                                   | not started                 | —                     | —                                     |
 | M9 — Docs and launch assets                          | not started                 | —                     | —                                     |
 | M10 — Release                                        | not started                 | —                     | —                                     |
@@ -390,7 +390,7 @@ The owner's own app (address and report kept outside this public repo, as agreed
 ## M7 — CLI polish
 
 - **Status:** built, owner review pending
-- **Commit:** see `git log` (the commit after `a10f0fb`)
+- **Commit:** `951404c`, plus a small follow-up commit (settings file saved with an invisible start mark; a closed ownership question when the output is piped)
 - **Pushed:** no — to be asked
 
 **What was already there (M0–M6):** all flags of SPEC §5.1, credentials from `SHIPCHECK_EMAIL` / `SHIPCHECK_PASSWORD`, the ownership question, CI detection, live progress lines, the printed summary, the no-key how-to, exit codes.
@@ -403,13 +403,13 @@ The owner's own app (address and report kept outside this public repo, as agreed
 4. **Tests that run the real command** (`test/e2e/cli.test.ts`, 19 tests): against the fixture with `--no-ai`, each in an empty temporary folder with an environment that holds no AI key (so no test can use a real key). Exit code 1 with a Blocker, 0 with `--fail-on none`, 2 for no address / invalid address / unknown flag / wrong value / no key / no confirmation / password or typo in the settings file; verdict, top three and report path printed; `--out`; settings file used and beaten by flags; and once on the built package (`npm run build`, then `node dist/cli.js`).
 5. **Password search (BUILD_PLAN M7):** a test account's password given by flag and by environment variable is really typed into the fixture's log-in form, and is then searched for in every written file, the terminal summary, the progress lines and the step summary (`test/e2e/no-password-in-output.test.ts`).
 
-**How it was verified:** typecheck and lint clean, 562 unit tests and 164 real-browser tests pass. Deliberate breakages, each failing a test: exit code always 0; settings file beating a flag; password allowed in the settings file; ownership question skipped; the user's password not scrubbed. By hand in a pretend terminal: the ownership question appears, "n" and Ctrl+D both stop with "Stopped. Nothing was tested." and exit code 2, nothing is written.
+**How it was verified:** typecheck and lint clean, 565 unit tests and 164 real-browser tests pass. Deliberate breakages, each failing a test: exit code always 0; settings file beating a flag; password allowed in the settings file; ownership question skipped; the user's password not scrubbed; a closed question not noticed. By hand in a pretend terminal (built package, local fixture): the ownership question appears; "y" runs the check (exit code 1, report written); "n" and Ctrl+D stop with "Stopped. Nothing was tested." and exit code 2, nothing written — also when the output is piped (that case first ended with a technical warning and exit code 13; fixed, with a unit test). The real opener was tried with no launcher available: it fails quietly and the run ends normally.
 
-**Not verified by a test:** that a browser window really opens on the owner's machine after a run (the decision and the call are tested with a stand-in opener). Answering "y" in a real terminal.
+**Not verified by a test:** that a browser window really opens on the owner's machine after a run (the decision and the call are tested with a stand-in opener); `--headed` (showing the browser).
 
 **Decided on the way (SPEC §13, 2026-11-15 M7):** `password` and `yes` are refused in the settings file; an app that does not open is exit code 1 (a Blocker), not 2.
 
-**Noticed, not changed:** when the app does not open at all, the progress line still says "Hidden errors… ✓" (the report itself shows it as not tested). The browser test suite now takes about 5–6 minutes locally; the CI job's limit is 15 minutes.
+**Noticed, not changed:** when the app does not open at all, the progress line still says "Hidden errors… ✓" (the report itself shows it as not tested). The browser test suite now takes about 5–6 minutes locally. The last CI run (`fc928dc`, before M7's 19 command tests) took 5 min 37 s in total; the CI job's limit is 15 minutes.
 
 ---
 

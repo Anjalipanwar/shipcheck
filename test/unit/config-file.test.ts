@@ -118,6 +118,11 @@ describe('shipcheck.config.json', () => {
     expect(() => readConfigFile(dir)).toThrow(/“skipMobil”.*Known settings: .*skipMobile/);
   });
 
+  it('reads a file saved by an editor that adds an invisible mark at the start (Notepad)', () => {
+    write('\uFEFF{ "out": "x" }');
+    expect(readConfigFile(dir)).toEqual({ out: 'x' });
+  });
+
   it('explains broken JSON in plain words', () => {
     write('{ "out": "x", }');
     expect(() => readConfigFile(dir)).toThrow(/not valid JSON/);

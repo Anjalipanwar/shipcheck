@@ -101,7 +101,7 @@ describe('the shipcheck command', () => {
     expect(existsSync(join(dir, 'shipcheck-report'))).toBe(false);
   });
 
-  it('--flows and --max-minutes are accepted and used', async () => {
+  it('--flows and --max-minutes are accepted (that they are used is proven in ai-flows and safety tests)', async () => {
     const { code, output } = await cli([
       app.url,
       ...quick,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { confirmOwnership } from '../../src/confirm.js';
+import { PassThrough } from 'node:stream';
+import { askInTerminal, confirmOwnership } from '../../src/confirm.js';
 import { ConfigError } from '../../src/config.js';
 import { exitCodeFor } from '../../src/exit-code.js';
 import { openReport, shouldOpenReport } from '../../src/open-report.js';
@@ -104,5 +105,21 @@ describe('ownership confirmation (SPEC §7.7)', () => {
     const situation = { ...terminal('y'), interactive: false };
     await expect(confirmOwnership(app, situation)).rejects.toThrow(/add --yes if you own the app/);
     expect(situation.ask).not.toHaveBeenCalled();
+  });
+});
+
+describe('asking a question in the terminal', () => {
+  it('returns the line that was typed', async () => {
+    const input = new PassThrough();
+    const answer = askInTerminal('Continue? ', input, new PassThrough());
+    input.write('y\n');
+    await expect(answer).resolves.toBe('y');
+  });
+
+  it('input closed before an answer (Ctrl+D): the question ends instead of hanging', async () => {
+    const input = new PassThrough();
+    const answer = askInTerminal('Continue? ', input, new PassThrough());
+    input.end();
+    await expect(answer).rejects.toThrow(/closed without an answer/);
   });
 });

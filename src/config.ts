@@ -105,7 +105,8 @@ export function readConfigFile(dir: string): FileSettings {
   if (!existsSync(path)) return {};
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(path, 'utf8'));
+    // Some editors (Notepad) put an invisible mark at the start of the file; JSON does not allow it.
+    raw = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
   } catch {
     throw new ConfigError(
       `${CONFIG_FILE} could not be read: it is not valid JSON. Check it for a missing comma, quote or bracket.`,

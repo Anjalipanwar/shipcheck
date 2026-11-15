@@ -9,10 +9,20 @@ export interface ConfirmSituation {
   ask?: (question: string) => Promise<string>;
 }
 
-async function askInTerminal(question: string): Promise<string> {
-  const readline = createInterface({ input: process.stdin, output: process.stdout });
+/** Asks one question on the given streams (the terminal, unless a test passes its own). */
+export async function askInTerminal(
+  question: string,
+  input: NodeJS.ReadableStream = process.stdin,
+  output: NodeJS.WritableStream = process.stdout,
+): Promise<string> {
+  const readline = createInterface({ input, output });
   try {
-    return await readline.question(question);
+    // If the input is closed before an answer comes (Ctrl+D), the question itself never
+    // finishes — so the closing is watched too, and counts as "no answer".
+    return await new Promise<string>((resolve, reject) => {
+      readline.once('close', () => reject(new Error('The question was closed without an answer')));
+      readline.question(question).then(resolve, reject);
+    });
   } finally {
     readline.close();
   }
@@ -25,7 +35,7 @@ async function askInTerminal(question: string): Promise<string> {
  */
 export async function confirmOwnership(
   config: Pick<Config, 'url' | 'yes'>,
-  { env, interactive, ask = askInTerminal }: ConfirmSituation,
+  { env, interactive, ask = (question) => askInTerminal(question) }: ConfirmSituation,
 ): Promise<void> {
   if (config.yes || env.CI === 'true') return;
   if (!interactive) {
