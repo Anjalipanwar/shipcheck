@@ -321,6 +321,18 @@ describe('the built package (node dist/cli.js after npm run build)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('test browser not installed: the built package shows the how-to with the install command too', async () => {
+    const { code, output } = await start(
+      [join(root, 'dist/cli.js')],
+      [app.url, '--no-ai', '--skip-mobile', '--yes', '--out', 'never-written'],
+      dir,
+      { PLAYWRIGHT_BROWSERS_PATH: join(dir, 'no-browsers-here') },
+    );
+    expect(code).toBe(2);
+    expect(output).toMatch(/npx playwright@\d+\.\d+\.\d+ install chromium/);
+    expect(existsSync(join(dir, 'never-written'))).toBe(false);
+  });
+
   it('runs a check and writes the report', async () => {
     const { code, output } = await start(
       [join(root, 'dist/cli.js')],

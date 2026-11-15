@@ -1,0 +1,41 @@
+name: False alarm
+description: ShipCheck reported a problem that is not one.
+title: 'False alarm: '
+labels: ['false alarm']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you — false alarms are treated as bugs. Please do not paste passwords, AI keys or private data.
+  - type: input
+    id: finding
+    attributes:
+      label: Title of the finding in the report
+      placeholder: e.g. "New users cannot sign up"
+    validations:
+      required: true
+  - type: textarea
+    id: reality
+    attributes:
+      label: What really happens in the app
+      description: What do you see when you do the same steps by hand?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What the report showed as evidence
+      description: The "What happened" text and the lines under "Evidence" of that finding. Remove anything private.
+  - type: input
+    id: version
+    attributes:
+      label: ShipCheck version
+      description: Shown at the top of the report, or run it with --version.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Kind of check
+      options:
+        - Full check (AI)
+        - Automatic checks only (--no-ai)
+        - GitHub Action

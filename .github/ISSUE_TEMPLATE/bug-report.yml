@@ -1,0 +1,38 @@
+name: Bug or missed problem
+description: ShipCheck crashed, behaved wrongly, or did not notice a real problem.
+title: 'Bug: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste passwords, AI keys or private data. For a security problem in ShipCheck itself, use the Security tab instead of an issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you run, and what did ShipCheck do or say?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Terminal output
+      description: Copy the lines ShipCheck printed. If it said "unexpected problem", run it again with SHIPCHECK_DEBUG=1 and copy that too.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: ShipCheck version
+      description: Run it with --version.
+  - type: input
+    id: system
+    attributes:
+      label: Computer and Node.js version
+      placeholder: e.g. macOS 15, Node 22.12

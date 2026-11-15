@@ -4,6 +4,14 @@
   "description": "A QA engineer's pre-launch checkup for your vibe-coded app — in one command.",
   "license": "MIT",
   "author": "Anjali Panwar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Anjalipanwar/shipcheck.git"
+  },
+  "homepage": "https://github.com/Anjalipanwar/shipcheck#readme",
+  "bugs": {
+    "url": "https://github.com/Anjalipanwar/shipcheck/issues"
+  },
   "type": "module",
   "bin": {
     "shipcheck": "dist/cli.js"
@@ -18,6 +26,7 @@
     "build": "tsup",
     "dev": "tsx src/cli.ts",
     "fixture": "tsx test/helpers/serve-fixture.ts",
+    "sample": "tsx scripts/make-sample-report.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",

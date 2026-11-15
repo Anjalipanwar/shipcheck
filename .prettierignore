@@ -9,3 +9,7 @@ CLAUDE.md
 docs/SPEC.md
 docs/BUILD_PLAN.md
 docs/KICKOFF_PROMPT.md
+
+# generated sample reports (npm run sample)
+examples/reports/
+docs-site/sample-report.html

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ShipCheck — a pre-launch checkup for your vibe-coded app</title>
+    <meta
+      name="description"
+      content="ShipCheck uses your app like a first-time visitor and writes a plain-English report with evidence and fix prompts. Free and open source."
+    />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --text: #1c2430;
+        --muted: #55606e;
+        --line: #d9dee5;
+        --accent: #0b6b4a;
+        --code: #f3f5f8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #12161c;
+          --text: #e8ecf1;
+          --muted: #a3adba;
+          --line: #2c3440;
+          --accent: #5fd0a3;
+          --code: #1b212a;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          17px/1.6 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 16px 64px;
+      }
+      h1 {
+        font-size: 2rem;
+        line-height: 1.2;
+        margin: 0 0 12px;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 40px 0 8px;
+      }
+      p.lead {
+        font-size: 1.15rem;
+        color: var(--muted);
+        margin: 0 0 24px;
+      }
+      pre {
+        background: var(--code);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px 16px;
+        overflow-x: auto;
+        font-size: 0.95rem;
+      }
+      a {
+        color: var(--accent);
+      }
+      .buttons a {
+        display: inline-block;
+        margin: 4px 12px 4px 0;
+        padding: 10px 16px;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .buttons a.primary {
+        background: var(--accent);
+        color: var(--bg);
+      }
+      li {
+        margin: 6px 0;
+      }
+      footer {
+        margin-top: 48px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ShipCheck</h1>
+      <p class="lead">
+        A QA engineer's pre-launch checkup for your vibe-coded app — in one command.
+      </p>
+      <p>
+        You built an app with Lovable, Bolt, v0, Replit, Cursor or Claude Code and you are about to
+        share the link. ShipCheck opens it in a real browser, uses it like a first-time visitor —
+        signs up, logs in, tries the main feature, fills in forms, on desktop and on a phone — and
+        writes a report in plain English: what is broken, the proof, and a prompt you can paste into
+        your AI builder to fix it.
+      </p>
+      <pre><code>npx @anjalipanwar/shipcheck https://myapp.lovable.app</code></pre>
+      <p class="buttons">
+        <a class="primary" href="sample-report.html">See a sample report</a>
+        <a href="https://github.com/Anjalipanwar/shipcheck#quickstart-about-5-minutes"
+          >Quickstart (5 minutes)</a
+        >
+        <a href="https://github.com/Anjalipanwar/shipcheck">Source on GitHub</a>
+      </p>
+
+      <h2>What you get</h2>
+      <ul>
+        <li>A clear verdict, and a table of what was tested and what could not be tested.</li>
+        <li>
+          Every problem with evidence: screenshots, steps to reproduce, what the app answered.
+        </li>
+        <li>A fix prompt for each problem, ready to paste into your AI builder.</li>
+        <li>No finding without evidence. When ShipCheck is not sure, it says “Not tested”.</li>
+      </ul>
+
+      <h2>What it will never do</h2>
+      <ul>
+        <li>Leave your app, pay for anything, or delete, send or publish something.</li>
+        <li>Attack your app. It only types the kind of messy input real people type.</li>
+        <li>Write a password or your AI key into a report or a file.</li>
+      </ul>
+
+      <h2>Free and yours</h2>
+      <p>
+        ShipCheck is open source (MIT) and runs on your own computer. You bring your own AI key — a
+        free one from Google is enough. Only test apps you own or have permission to test.
+      </p>
+      <footer>
+        ShipCheck is an automated pre-launch check. It is not a security audit and not a guarantee
+        that an app is free of bugs. The sample report was made from a pretend app with planted
+        bugs, with the automatic checks only.
+      </footer>
+    </main>
+  </body>
+</html>

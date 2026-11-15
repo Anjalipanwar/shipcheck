@@ -3,24 +3,24 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-15, M8 done (action self-test green on GitHub at the first push); M9 started
-- **Next up:** M9 — Docs and launch assets (owner: "when CI is green, go for M9"). For the real-app sample report the owner provides a second app she owns — **ask her for the URL when that step is reached.** Open question: push of the local commits after `e28acdf`.
+- **Last updated:** 2026-11-16, M9 built as far as possible without the owner; waiting for the owner's answers
+- **Next up:** the owner's answers on M9 (list at the end of the M9 section): URL and consent for the real-app sample report, real-key runs, licence name, private security reporting, project page, push. M10 not started.
 
 ## Overview
 
-| Milestone                                            | Status      | Commit                           | Pushed                                                      |
-| ---------------------------------------------------- | ----------- | -------------------------------- | ----------------------------------------------------------- |
-| M0 — Scaffold                                        | done        | `b59adfc`                        | yes                                                         |
-| M1 — Fixture app with planted bugs                   | done        | `2d605ba`                        | yes                                                         |
-| M2 — Browser session, evidence, deterministic checks | done        | `6498102`                        | yes                                                         |
-| M3 — Report renderer and verdict                     | done        | `8e0b406`                        | yes                                                         |
-| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63`                        | yes                                                         |
-| M5 — Mobile pass                                     | done        | `f168b9e`                        | yes                                                         |
-| M6 — AI judge, fix prompts, dedupe                   | done        | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
-| M7 — CLI polish                                      | done        | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
-| M8 — GitHub Action                                   | done        | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
-| M9 — Docs and launch assets                          | not started | —                                | —                                                           |
-| M10 — Release                                        | not started | —                                | —                                                           |
+| Milestone                                            | Status                                 | Commit                           | Pushed                                                      |
+| ---------------------------------------------------- | -------------------------------------- | -------------------------------- | ----------------------------------------------------------- |
+| M0 — Scaffold                                        | done                                   | `b59adfc`                        | yes                                                         |
+| M1 — Fixture app with planted bugs                   | done                                   | `2d605ba`                        | yes                                                         |
+| M2 — Browser session, evidence, deterministic checks | done                                   | `6498102`                        | yes                                                         |
+| M3 — Report renderer and verdict                     | done                                   | `8e0b406`                        | yes                                                         |
+| M4 — AI flows with Stagehand + safety guard          | done                                   | `f5f7e63`                        | yes                                                         |
+| M5 — Mobile pass                                     | done                                   | `f168b9e`                        | yes                                                         |
+| M6 — AI judge, fix prompts, dedupe                   | done                                   | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
+| M7 — CLI polish                                      | done                                   | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
+| M8 — GitHub Action                                   | done                                   | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
+| M9 — Docs and launch assets                          | built, waiting for the owner's answers | see M9 section                   | no                                                          |
+| M10 — Release                                        | not started                            | —                                | —                                                           |
 
 ## Standing instructions from the owner
 
@@ -405,7 +405,7 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 **How it was verified:** typecheck and lint clean, 565 unit tests and 164 real-browser tests pass. Deliberate breakages, each failing a test: exit code always 0; settings file beating a flag; password allowed in the settings file; ownership question skipped; the user's password not scrubbed; a closed question not noticed. By hand in a pretend terminal (built package, local fixture): the ownership question appears; "y" runs the check (exit code 1, report written); "n" and Ctrl+D stop with "Stopped. Nothing was tested." and exit code 2, nothing written — also when the output is piped (that case first ended with a technical warning and exit code 13; fixed, with a unit test). The real opener was tried with no launcher available: it fails quietly and the run ends normally.
 
-**Not verified by a test, but by the owner by hand on her Mac (2026-11-15):** `--headed` shows the browser; the report opens by itself at the end.
+**Not verified by a test, but by the owner by hand on a Mac (2026-11-15):** `--headed` shows the browser; the report opens by itself at the end.
 
 **Decided on the way (SPEC §13, 2026-11-15 M7):** `password` and `yes` are refused in the settings file; an app that does not open is exit code 1 (a Blocker), not 2.
 
@@ -419,7 +419,7 @@ The owner's own app (address and report kept outside this public repo, as agreed
 - **Commit:** `8727d73`, plus a follow-up commit (report uploaded before the job is failed; the caller's package cache and `NODE_ENV` left alone; the package built once for all browser tests)
 - **Pushed:** `2ae567d`, `8727d73`, `e28acdf` pushed on the owner's request. **No fix-up was needed:** both workflows were green at the first push. Action self-test: 1 min 00 s (lenient run 28 s including the build and Chromium, strict run 6 s, no-key run 4 s); three checks as designed — green with `fail-on: none`, failed with exit code 1 on a Blocker, exit code 2 without a key. Two report artifacts were uploaded (`shipcheck-report-lenient`, `shipcheck-report-strict`), none for the run that could not start. CI: 6 min 52 s (Node 22) and 6 min 39 s (Node 24), browser tests just under 6 minutes — up from about 5 because of the M7/M8 command tests, still under the 10 minutes above which the owner wants them split.
 
-**Owner's answers (2026-11-15):** hand test on her Mac — browser window visible with `--headed`: yes; report opened by itself at the end: yes. M10 checklist gets: switch the example workflow and README from `@main` to `@v0` once the tag exists, and test the example against the tag (added to `docs/BUILD_PLAN.md`; the example now says `@main`). For M9's real-app sample report she provides a second app she owns; ask for the URL then.
+**Owner's answers (2026-11-15):** hand test on the owner's Mac — browser window visible with `--headed`: yes; report opened by itself at the end: yes. M10 checklist gets: switch the example workflow and README from `@main` to `@v0` once the tag exists, and test the example against the tag (added to `docs/BUILD_PLAN.md`; the example now says `@main`). For M9's real-app sample report the owner provides a second app they own; ask for the URL then.
 
 **What was built**
 
@@ -433,6 +433,37 @@ The owner's own app (address and report kept outside this public repo, as agreed
 **Not verified:** the action used from another repository (`uses: Anjalipanwar/shipcheck@main`) — the self-test uses it from this repository (`uses: ./`); a full check with a real key inside GitHub Actions; the look of the run summary page (its text is tested, the page was not opened).
 
 **Also in this stretch (M7 leftovers):** the terminal-versus-report test now also compares the grouped rows (basic security, flows on a phone); `--headed` was run once by me against the fixture (it ran through; a browser window showed briefly).
+
+## M9 — Docs and launch assets
+
+- **Status:** built as far as possible without the owner; **not done** — open points below
+- **Commit:** `408200c` (missing-browser message, fixture names) and the M9 commit after it (hash in `git log`: it is the commit named "docs: README, licence, …")
+- **Pushed:** no — to be asked
+
+**What was built**
+
+1. **README** (written from what the code does today): what ShipCheck is, quickstart in three steps, "Get a free AI key" and "Add a test account" (the two sections reports point to), what it checks, options, settings file, exit codes, GitHub Action, what it will never do, limits, privacy and cost, questions, running from source. A note at the top says the package is not on npm before M10.
+2. **`LICENSE`** (MIT, © 2026 Anjali Panwar — name to be confirmed), **`CONTRIBUTING.md`**, **`SECURITY.md`** (GitHub's private reporting, no email address), **`CHANGELOG.md`**, three issue templates (false alarm, bug or miss, idea), and `repository` / `homepage` / `bugs` in `package.json`.
+3. **Sample report** `examples/reports/buggy-app.md` and `.html`, made by `npm run sample` from the fixture with automatic checks only. Checked: the fake secret key is masked, no path of this computer, no email address.
+4. **First run without the test browser:** instead of "unexpected problem", a plain message with the one install command, naming the exact version ShipCheck was built with; exit code 2 (`src/browser/missing-browser.ts`).
+5. **Tests for "every command and link shown in a report must work"** (`test/unit/docs.test.ts`, 14 tests): the report's "How to get a free AI key" link leads to a README section that exists (anchor computed the way GitHub does) and says how; "Add a test account (see the README)" has its section with both ways; every link in README, CONTRIBUTING, SECURITY and CHANGELOG leads somewhere; every flag named in the advice texts, in every message of the flows and the runner, and in the README exists in the command; the README's options table lists every flag; its settings-file example is accepted; its Action example matches `examples/github-workflow.yml`; the sample report exists and shows no secret.
+6. **Project page and demo GIF:** `docs-site/index.html` plus the sample report, and step-by-step notes for the owner in `docs/notes/launch-assets.md`. Nothing is published.
+7. **Fixture clean-up:** two recipe names in `/planner.html`, its test and SPEC §13 had been copied from the screen of the owner's app; replaced by made-up ones. They are still in the pushed history (`6403dbc`, `a10f0fb`).
+
+**How it was verified:** typecheck and lint clean, 588 unit tests and 181 real-browser tests pass. Deliberate breakages, each failing a test: the "Get a free AI key" heading renamed; the test-account section renamed; an advice text naming a flag that does not exist; the README naming a flag that does not exist. The missing-browser message is tested by running the command with an empty browser folder.
+
+**Not verified:** the plan's own condition — "a non-technical person could follow the README quickstart in under 5 minutes" — needs a person; the `npx` command in the README cannot work before M10; how the issue templates and the project page look on GitHub.
+
+**Open, needs the owner**
+
+1. Real-app sample report: the URL of the second app, and the owner's consent that its address, screenshots and findings become public in the repository for good.
+2. Real-key runs: one for that app; optionally one on the fixture for a full-check sample report.
+3. Licence name "Anjali Panwar" — confirm.
+4. `SECURITY.md` points to GitHub's private vulnerability reporting and names no response time; the reporting must be switched on in the repository settings (Settings → Code security → Private vulnerability reporting).
+5. Project page: publish it or not (steps in `docs/notes/launch-assets.md`). Demo GIF: record it or leave it out.
+6. The copied recipe names in the pushed history, and the planner fixture page as such: leave them, or change the page's theme and/or rewrite history (a force-push).
+7. Someone timing the quickstart.
+8. Push of the local commits after `e28acdf`.
 
 ---
 
