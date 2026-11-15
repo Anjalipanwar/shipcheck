@@ -246,7 +246,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 ## M5 follow-ups (owner decisions of 2026-11-15)
 
 - **Status:** done
-- **Commit:** `7dc0626`
+- **Commit:** `7dc0626`, fix `67b4a5a`
 - **Pushed:** no — waiting for the owner's answer
 
 **Owner decisions (2026-11-15)**
