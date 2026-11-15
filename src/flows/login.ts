@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { PROMPTS } from '../ai/prompts.js';
 import { ADVICE } from '../report/present.js';
+import { watchSubmission } from './answer.js';
 import { FlowContext, newIdentity, type FlowBody } from './context.js';
 import { click, fill, first, readFields, type Field } from './fields.js';
 
@@ -49,7 +50,13 @@ export const loginFlow: FlowBody = async (ctx) => {
     );
     return;
   }
-  const account = ctx.shared.account;
+  // The account the sign-up flow made or was given — or the one from --email and --password,
+  // when signing up was left out with --flows.
+  const account =
+    ctx.shared.account ??
+    (ctx.config.email && ctx.config.password
+      ? { email: ctx.config.email, password: ctx.config.password }
+      : undefined);
   const email = account?.email ?? newIdentity().email;
   const base = { category: 'functional' as const, url: form.url };
 
@@ -62,6 +69,7 @@ export const loginFlow: FlowBody = async (ctx) => {
     `Type a wrong password into “${form.password.label}”`,
   );
   const before = await ctx.snapshot();
+  const wrongTry = watchSubmission(ctx, [email]);
   const tried = await ctx.perform(
     click(form.submit),
     `Click “${form.submit.label}” with the wrong password`,
@@ -70,7 +78,8 @@ export const loginFlow: FlowBody = async (ctx) => {
     ctx.skip(`Logging in — ShipCheck did not press “${form.submit.label}” (${tried.reason})`);
     return;
   }
-  const after = await ctx.snapshot();
+  // Waits for the server's answer: a "Logging in…" label is not yet the app's reaction.
+  const after = await wrongTry.outcome(before, await ctx.snapshot(), 'answer');
   const wrongSteps = [
     `Open ${form.url}.`,
     'Type an email address and a password that is wrong.',
@@ -99,20 +108,18 @@ export const loginFlow: FlowBody = async (ctx) => {
       screenshots: shot ? [shot] : [],
       logs: [
         'Page address and visible text were identical before and after submitting a wrong password',
-        ...ctx.evidence.events
-          .filter((e) => e.kind === 'write-response')
+        ...wrongTry
+          .answers()
           .slice(-1)
-          .flatMap((e) =>
-            e.kind === 'write-response'
-              ? [`The server answered the log-in request with status ${e.status}`]
-              : [],
-          ),
+          .map((e) => `The server answered the log-in request with status ${e.status}`),
       ],
       confidence: 'verified',
     });
   } else {
     const outcome = await ctx.extract(PROMPTS.loginOutcome, OutcomeSchema);
-    if (outcome.loggedIn) {
+    // What the server said outranks what the model read from the page: a refused log-in did
+    // not let anyone in, whatever the page's text claims.
+    if (outcome.loggedIn && !wrongTry.refused()) {
       const shot = await ctx.shot('logged in with wrong password');
       ctx.record({
         ...base,
@@ -181,16 +188,20 @@ export const loginFlow: FlowBody = async (ctx) => {
     `Type the correct password into “${form.password.label}”`,
   );
   const beforeRight = await ctx.snapshot();
+  const rightTry = watchSubmission(ctx, [account.email]);
   await ctx.perform(click(form.submit), `Click “${form.submit.label}” with the correct password`);
-  const afterRight = await ctx.snapshot();
+  const afterRight = await rightTry.outcome(beforeRight, await ctx.snapshot());
   const passwordField = () => ctx.page.locator('input[type="password"]:visible').count();
   let loggedIn = afterRight.url !== beforeRight.url && (await passwordField()) === 0;
   let message = '';
   let confidence: 'verified' | 'ai-judgement' = 'verified';
   if (!loggedIn) {
     const outcome = await ctx.extract(PROMPTS.loginOutcome, OutcomeSchema);
-    loggedIn = outcome.loggedIn;
-    message = outcome.messageText;
+    loggedIn = outcome.loggedIn && !rightTry.refused(); // the server's answer outranks the model
+    // A message that already stood on the page before the click (left over from the wrong
+    // password) says nothing about this attempt — unless the server refused this one too.
+    const leftOver = beforeRight.text.includes(outcome.messageText.trim());
+    message = rightTry.refused() || !leftOver ? outcome.messageText : '';
     confidence = 'ai-judgement';
   }
   const rightSteps = [
@@ -198,6 +209,18 @@ export const loginFlow: FlowBody = async (ctx) => {
     'Type the email address and the correct password of an existing account.',
     `Click “${form.submit.label}”.`,
   ];
+  if (!loggedIn && !message && rightTry.accepted()) {
+    // No error on screen and the server accepted the log-in: calling this "broken" would be a
+    // guess. A Blocker needs proof of failure, not missing proof of success.
+    ctx.skip(
+      'Logging in — the log-in was sent and the app accepted it, but ShipCheck could not confirm that the user ends up inside the app. Please check it by hand',
+      {
+        reason: 'the log-in was accepted, but ShipCheck could not confirm that it let the user in',
+        action: ADVICE.byHand,
+      },
+    );
+    return;
+  }
   if (!loggedIn) {
     const shot = await ctx.shot('login failed');
     ctx.record({
@@ -215,6 +238,11 @@ export const loginFlow: FlowBody = async (ctx) => {
       screenshots: shot ? [shot] : [],
       logs: [
         message ? `Message on the page: ${message}` : 'No message was shown',
+        ...rightTry
+          .answers()
+          .filter((e) => e.status >= 400)
+          .slice(0, 1)
+          .map((e) => `The server refused the log-in request (answer code ${e.status})`),
         `Address after submitting: ${afterRight.url}`,
       ],
       fixPrompt: `Logging in to my app fails with a correct email address and password.${message ? ` The page shows: “${message}”.` : ''} Please check the log-in request and the server logs, and fix the cause.`,

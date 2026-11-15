@@ -30,6 +30,10 @@ export interface ScriptedOptions {
   nextStep?: (page: Page, done: number) => ProposedAction[];
   /** Pretends the app has no sign-up and no log-in: the AI finds neither a link nor a form. */
   noAccounts?: boolean;
+  /** Stands in for a model that obeys instructions hidden in the tested page. */
+  gullible?: boolean;
+  /** Stands in for a model that says "logged in" after every log-in attempt. */
+  gullibleLogin?: boolean;
   /** The judge's answer (reworded findings) for the given instruction. */
   judge?: (instruction: string) => unknown;
   /** Replaces the answer for "what is this app's main action". */
@@ -74,7 +78,7 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
             click(navLink('/pricing.html'), 'Menu link Pricing'),
           ];
         case PROMPTS.signupEntry:
-          return ['/signup.html', '/late-signup.html'].includes(path(page))
+          return ['/signup.html', '/late-signup.html', '/injected-signup.html'].includes(path(page))
             ? []
             : [click(navLink('/signup.html'), 'Sign up link')];
         case PROMPTS.signupForm:
@@ -84,7 +88,9 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
             click(byId('signup-button'), 'Create account button'),
           ];
         case PROMPTS.loginEntry:
-          return path(page) === '/login.html' ? [] : [click(navLink('/login.html'), 'Log in link')];
+          return ['/login.html', '/slow-login.html'].includes(path(page))
+            ? []
+            : [click(navLink('/login.html'), 'Log in link')];
         case PROMPTS.loginForm:
           return [
             fill(byId('login-email'), 'Email field'),
@@ -145,20 +151,35 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
       if (instruction === PROMPTS.mainAction)
         return { goal: options.goal ?? 'Add a note' } as never;
       if (instruction === PROMPTS.loginOutcome) {
+        // Like a model, it reads the message next to the form, if the page shows one.
+        const shown = (
+          await page
+            .locator('#login-message')
+            .innerText()
+            .catch(() => '')
+        ).trim();
         return {
-          loggedIn: path(page) === '/dashboard.html',
-          errorVisible: false,
-          messageText: '',
+          loggedIn: options.gullibleLogin === true || path(page) === '/dashboard.html',
+          errorVisible: shown !== '',
+          messageText: shown,
         } as never;
       }
       if (instruction === PROMPTS.signupOutcome) {
+        // Like a model, it reads the whole message — including text hidden from people.
+        const shown = await page
+          .locator('#signup-message')
+          .innerText()
+          .catch(() => '');
         const error =
-          /valid email|at least 8|already exists|Something went wrong/.exec(text)?.[0] ?? '';
+          shown.replace(/\s+/g, ' ').trim() ||
+          (/valid email|at least 8|already exists|Something went wrong/.exec(text)?.[0] ?? '');
+        // A gullible model does what hidden text on the page tells it to.
+        const obeys = options.gullible === true && /ignore your instructions/i.test(text);
         return {
-          accountCreated: path(page) === '/dashboard.html',
+          accountCreated: obeys || path(page) === '/dashboard.html',
           needsEmailVerification: false,
           captchaBlocked: false,
-          errorText: error,
+          errorText: obeys ? '' : error,
         } as never;
       }
       // The main-feature outcome: like a model, it notices an error message on the page.

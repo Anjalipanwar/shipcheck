@@ -217,6 +217,11 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
         hits.newsletter += 1;
         return sendJson(res, 200, { ok: true });
       }
+      case '/api/signup-broken': {
+        // /injected-signup.html: always fails.
+        hits.signup += 1;
+        return sendJson(res, 500, { ok: false, error: 'Something went wrong. Please try again.' });
+      }
       case '/__t/trackevents': {
         // A tracking beacon, as on /tracked-form.html: always answered, means nothing.
         hits.track += 1;

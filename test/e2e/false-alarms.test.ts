@@ -4,7 +4,11 @@ import type { Report } from '../../src/report/schema.js';
 import { runShipCheck } from '../../src/runner.js';
 import type { Page } from 'playwright';
 import type { ProposedAction } from '../../src/browser/guard.js';
-import { startFixtureServer, type FixtureOptions } from '../helpers/fixture-server.js';
+import {
+  DEMO_ACCOUNT,
+  startFixtureServer,
+  type FixtureOptions,
+} from '../helpers/fixture-server.js';
 import { createScriptedDriver, type ScriptedOptions } from '../helpers/scripted-driver.js';
 
 /**
@@ -24,11 +28,12 @@ const run = async (
   flows: string,
   server: FixtureOptions = {},
   driver: ScriptedOptions = {},
+  flags: Record<string, string> = {},
 ) => {
   const app = await startFixtureServer(server);
   try {
     const result = await runShipCheck(
-      loadConfig(`${app.url}${path}`, { yes: true, flows, skipMobile: true }, {}),
+      loadConfig(`${app.url}${path}`, { yes: true, flows, skipMobile: true, ...flags }, {}),
       {},
       { aiDriver: (budget) => createScriptedDriver({ budget, ...driver }) },
     );
@@ -54,6 +59,58 @@ describe('false alarms from the real-app run', () => {
       'blocker: New users cannot sign up',
     ]);
     expect(found[0]?.whatHappened).toContain('Something went wrong');
+  });
+
+  it('a log-in that answers slowly: the wrong password’s message and the successful log-in are both seen', async () => {
+    const { report } = await run('/slow-login.html', 'login', {}, {}, DEMO_ACCOUNT);
+    expect(problems(report, 'login/').map((f) => `${f.severity}: ${f.title}`)).toEqual([]);
+    expect(report.passed).toEqual(
+      expect.arrayContaining([
+        'A wrong password shows a clear message',
+        'Logging in with the correct password works',
+      ]),
+    );
+    expect(report.coverage.find((e) => e.area === 'login')?.state).toBe('no-problems');
+  });
+
+  it('control: a slow log-in the server really refuses is still a Blocker, with the app’s message', async () => {
+    const { report } = await run(
+      '/slow-login.html',
+      'login',
+      { rejectAllLogins: true },
+      {},
+      DEMO_ACCOUNT,
+    );
+    const found = problems(report, 'login/');
+    expect(found.map((f) => `${f.severity}: ${f.title}`)).toEqual(['blocker: Users cannot log in']);
+    expect(found[0]?.whatHappened).toContain('Invalid login credentials');
+  });
+
+  it('a message left over from the wrong password is not proof that the right one failed', async () => {
+    // The server accepts the log-in and the app opens in place (same address), but the old
+    // "Invalid login credentials" still stands on the page. Not a Blocker: "Not tested".
+    const { report } = await run('/slow-login.html?inplace=1', 'login', {}, {}, DEMO_ACCOUNT);
+    expect(problems(report, 'login/').map((f) => `${f.severity}: ${f.title}`)).toEqual([]);
+    expect(report.passed).toContain('A wrong password shows a clear message');
+    const row = report.coverage.find((e) => e.area === 'login');
+    expect(row?.state).toBe('not-tested');
+    expect(row?.note).toMatch(/could not confirm/);
+  });
+
+  it('a model that says “logged in” after every attempt is overruled by the server’s refusal', async () => {
+    const { report } = await run(
+      '/slow-login.html',
+      'login',
+      { rejectAllLogins: true },
+      { gullibleLogin: true },
+      DEMO_ACCOUNT,
+    );
+    expect(report.findings.map((f) => f.rule)).not.toContain('login/accepts-wrong-password');
+    expect(report.passed).toContain('A wrong password shows a clear message');
+    expect(report.passed).not.toContain('Logging in with the correct password works');
+    expect(problems(report, 'login/').map((f) => `${f.severity}: ${f.title}`)).toEqual([
+      'blocker: Users cannot log in',
+    ]);
   });
 
   it('a tracking beacon is not “the server accepted the form”: a form that refuses bad input has no finding', async () => {

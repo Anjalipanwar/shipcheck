@@ -86,12 +86,27 @@ const LIMITS = { title: 110, whatHappened: 600, whyItMatters: 300, fixPrompt: 12
 const links = (text: string): string[] =>
   (text.match(/https?:\/\/[^\s"'”)]+/g) ?? []).map((link) => link.replace(/[.,;:!?]+$/, ''));
 
-/** A rewording is used only if it is complete, short, jargon-free and adds no new link. */
+/** A rewording that says there is no problem contradicts the finding it rewords. */
+const DENIES =
+  /\b(no (problems?|issues?|bugs?|errors?)(?! (message|messages|text|hint|notice|warning))( (were |was )?found)?|nothing (is |was )?(wrong|broken)|not a (bug|problem|real)|works? (fine|correctly|as expected|as intended|properly|perfectly)|false (alarm|positive)|can be ignored|was created successfully)\b/i;
+/** True if the text, quoted app messages aside, claims that there is no problem. */
+export const deniesProblem = (text: string): boolean => DENIES.test(text.replace(/“[^”]*”/g, ''));
+const quotes = (text: string): string[] => text.match(/“[^”]{3,}”/g) ?? [];
+
+/**
+ * A rewording is used only if it is complete, short, jargon-free, adds no new link, keeps every
+ * quoted message of the original, and does not turn the finding into "no problem".
+ */
 export function acceptable(original: Finding, next: Reworded): boolean {
   const fields = ['title', 'whatHappened', 'whyItMatters', 'fixPrompt'] as const;
   if (fields.some((field) => next[field].trim().length < 8)) return false;
   if (fields.some((field) => next[field].length > LIMITS[field])) return false;
   if (hasJargon(next.title)) return false;
+  // Quoted app messages are data and may say anything; the judge's own words may not deny.
+  if (deniesProblem(fields.map((field) => next[field]).join(' '))) return false;
+  if (!quotes(original.whatHappened).every((quote) => next.whatHappened.includes(quote))) {
+    return false;
+  }
   const known = new Set(
     links(
       [
