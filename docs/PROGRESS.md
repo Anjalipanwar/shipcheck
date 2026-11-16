@@ -4,7 +4,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
 - **Last updated:** 2026-11-16, M10 done: 0.1.0 is on npm, tags `v0.1.0` and `v0` are set, the project page is live
-- **Next up:** nothing is in progress. Open with the owner: the GitHub release for `v0.1.0`, the timed quickstart, the "About" box, the demo GIF; later release: a real-app sample report.
+- **Next up:** nothing is in progress. Planned: see "Next release (0.1.1)" below. Open with the owner: the GitHub release for `v0.1.0`, the timed quickstart, the "About" box, the demo GIF; later release: a real-app sample report.
 
 ## Overview
 
@@ -508,6 +508,15 @@ The owner's own app (address and report kept outside this public repo, as agreed
 3. Put the project page's address into the repository's "About" box.
 4. Record the demo GIF (`docs/notes/launch-assets.md`); the README gets it then.
 5. Later release: a real-app sample report. Until then nothing about the owner's real apps goes into the repository.
+
+---
+
+## Next release (0.1.1)
+
+Not started. Nothing here is decided beyond what the issue says.
+
+1. **Issue #1 — "Hide npm's ERESOLVE and deprecation warnings on first npx run"** (https://github.com/Anjalipanwar/shipcheck/issues/1, opened 2026-11-16 at the owner's request). On the first `npx @anjalipanwar/shipcheck …` run with an empty npm cache, npm prints `npm warn ERESOLVE overriding peer dependency` and `npm warn deprecated node-domexception@1.0.0: …` before ShipCheck starts. The run works, but new users see these lines first. To investigate: which packages cause them; whether `overrides` in `package.json` removes them (not tested: `overrides` may have no effect for a package installed through `npx`); whether a dependency update removes them; otherwise a sentence in the README quickstart. Done when the command prints no npm warning from an empty folder with an empty cache, checked with the packed file before publishing. No label or milestone on the issue (owner's choice).
+2. **For the release itself:** after `npm publish`, check `npm view @anjalipanwar/shipcheck versions` first (npm may show only a placeholder until the owner approves the staged version); move the `v0` tag to the new release and watch the "Release check" run.
 
 ---
 
