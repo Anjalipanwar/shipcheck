@@ -3,24 +3,24 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-16, M10 prepared up to the owner's steps (publish, Pages setting, tags)
-- **Next up:** M10, the owner's steps — see "Waiting for the owner" in the M10 section. Then: check the published package from an empty folder, set the tags `v0.1.0` and `v0`, check the release-check run and the project page.
+- **Last updated:** 2026-11-16, M10 done: 0.1.0 is on npm, tags `v0.1.0` and `v0` are set, the project page is live
+- **Next up:** nothing is in progress. Open with the owner: the GitHub release for `v0.1.0`, the timed quickstart, the "About" box, the demo GIF; later release: a real-app sample report.
 
 ## Overview
 
-| Milestone                                            | Status   | Commit                           | Pushed                                                      |
-| ---------------------------------------------------- | -------- | -------------------------------- | ----------------------------------------------------------- |
-| M0 — Scaffold                                        | done     | `b59adfc`                        | yes                                                         |
-| M1 — Fixture app with planted bugs                   | done     | `2d605ba`                        | yes                                                         |
-| M2 — Browser session, evidence, deterministic checks | done     | `6498102`                        | yes                                                         |
-| M3 — Report renderer and verdict                     | done     | `8e0b406`                        | yes                                                         |
-| M4 — AI flows with Stagehand + safety guard          | done     | `f5f7e63`                        | yes                                                         |
-| M5 — Mobile pass                                     | done     | `f168b9e`                        | yes                                                         |
-| M6 — AI judge, fix prompts, dedupe                   | done     | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
-| M7 — CLI polish                                      | done     | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
-| M8 — GitHub Action                                   | done     | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
-| M9 — Docs and launch assets                          | done     | see M9 section                   | see M9 section                                              |
-| M10 — Release                                        | prepared | see M10 section                  | no                                                          |
+| Milestone                                            | Status | Commit                           | Pushed                                                      |
+| ---------------------------------------------------- | ------ | -------------------------------- | ----------------------------------------------------------- |
+| M0 — Scaffold                                        | done   | `b59adfc`                        | yes                                                         |
+| M1 — Fixture app with planted bugs                   | done   | `2d605ba`                        | yes                                                         |
+| M2 — Browser session, evidence, deterministic checks | done   | `6498102`                        | yes                                                         |
+| M3 — Report renderer and verdict                     | done   | `8e0b406`                        | yes                                                         |
+| M4 — AI flows with Stagehand + safety guard          | done   | `f5f7e63`                        | yes                                                         |
+| M5 — Mobile pass                                     | done   | `f168b9e`                        | yes                                                         |
+| M6 — AI judge, fix prompts, dedupe                   | done   | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
+| M7 — CLI polish                                      | done   | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
+| M8 — GitHub Action                                   | done   | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
+| M9 — Docs and launch assets                          | done   | see M9 section                   | see M9 section                                              |
+| M10 — Release                                        | done   | `38c5fec`                        | yes, with tags `v0.1.0`, `v0`                               |
 
 ## Standing instructions from the owner
 
@@ -471,9 +471,9 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 ## M10 — Release
 
-- **Status:** prepared; **waiting for the owner's steps** (below). Not published, no tag yet.
-- **Commit:** the commit named "chore(release): 0.1.0 …" (hash in `git log`)
-- **Pushed:** no — to be asked
+- **Status:** done — `@anjalipanwar/shipcheck@0.1.0` is on npm (published by the owner), tags `v0.1.0` and `v0` point to `38c5fec`, project page live at https://anjalipanwar.github.io/shipcheck/
+- **Commit:** `38c5fec` (the release), plus the docs commit after it that records this result
+- **Pushed:** `38c5fec` and both tags yes; the docs commit after it — to be asked
 
 **What was done**
 
@@ -488,13 +488,26 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 **Not verified yet:** the full check (with an AI key) from the installed package — no real-key run was made; the owner's timed quickstart covers it. The two new workflows have not run on GitHub yet. `npx @anjalipanwar/shipcheck` itself, which exists only after the publish.
 
-**Waiting for the owner**
+**After the push and the publish (2026-11-16)**
 
-1. Push of the release commit — and before it, Settings → Pages → Source = "GitHub Actions" (otherwise the project page run fails).
-2. `npm publish` in the repository folder (the owner's step; npm may ask for a one-time code).
-3. After the publish is checked: permission to set and push the tags `v0.1.0` and `v0`.
-4. GitHub release for `v0.1.0`: created by the owner on GitHub with the CHANGELOG text (no access from here).
-5. Afterwards, by the owner: time the quickstart with the real `npx` command; put the project page's address into the repository's "About" box; record the demo GIF.
+1. **CI for `38c5fec`:** green — CI 7 min 33 s, Action self-test 1 min 31 s, Project page 24 s.
+2. **Project page:** https://anjalipanwar.github.io/shipcheck/ answers, both sample reports open from it, the full sample served there is identical to the file in the repository (checked by fetching, not by eye).
+3. **Publish, first attempt:** npm showed only a placeholder version `0.0.0-stage` ("awaiting a staged release") and no 0.1.0; `npx` failed with "could not determine executable to run". No tag was set. This is npm's staged publishing: the real version appears only after the owner's approval. Lesson for the next release: after `npm publish`, check `npm view @anjalipanwar/shipcheck versions` before anything else.
+4. **Publish, checked:** 0.1.0 is `latest` (7 files). From an empty folder with an empty npm cache, with the real command: `npx @anjalipanwar/shipcheck --help` works (this is the plan's "done when"), `--version` → 0.1.0, automatic checks on the fixture → exit code 1, the expected verdict (1 Blocker, 1 Major, 6 Minor, 1 Info) and a report with screenshots, no key → exit code 2. The published `dist/cli.js` and `dist/main-*.js` are byte-identical to a build of `38c5fec`; the published README says `@v0` and has no pre-release note.
+5. **Tags:** `v0.1.0` and `v0` set on `38c5fec` only after that check, and pushed.
+6. **Release check (the example against the tag):** green in 49 s — `Anjalipanwar/shipcheck@v0` ran against the fixture, found the planted secret key, and attached the `shipcheck-report` artifact.
+
+**Seen, not changed:** on the first `npx` run npm prints two warnings of its own ("ERESOLVE overriding peer dependency", a deprecated sub-package). They come from dependencies of the AI browser library and do not affect the run.
+
+**Not verified:** the full check with an AI key from the published package (no real-key run was made) — covered by the owner's timed quickstart.
+
+**Open, with the owner**
+
+1. GitHub release for `v0.1.0`: created by the owner on GitHub with the 0.1.0 section of `CHANGELOG.md` (no access from here).
+2. Time the README quickstart with the real `npx` command (target: under 5 minutes) — M9's "done when".
+3. Put the project page's address into the repository's "About" box.
+4. Record the demo GIF (`docs/notes/launch-assets.md`); the README gets it then.
+5. Later release: a real-app sample report. Until then nothing about the owner's real apps goes into the repository.
 
 ---
 
