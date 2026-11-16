@@ -73,7 +73,7 @@ Estimated total: ~2 focused days. Times are rough guides, not limits.
 - Remove the "Before the first release" note from the README's top once the package is on npm (the section "Run it from the source code" stays, for contributors), and move the CHANGELOG's "Unreleased" entries under `0.1.0` with the date.
 - **Publish the project page with GitHub Pages (owner decision 2026-11-16):** add the Pages workflow for `docs-site/`, the owner sets Settings → Pages → Source to "GitHub Actions", then check the page, both sample reports and its links (steps in `docs/notes/launch-assets.md`).
 - **Owner times the quickstart (owner decision 2026-11-16):** after publishing, the owner follows the README quickstart with the real `npx` command and times it (target: under 5 minutes). This is M9's "done when", moved here because the command does not exist before the release.
-- **After M10, by the owner:** record the demo GIF with `docs/notes/launch-assets.md`; the README gets it then. Switch on private vulnerability reporting on GitHub (SECURITY.md relies on it). A real-app sample report comes in a later release — until then nothing about the owner's real apps goes into the repository.
+- **After M10, by the owner:** record the demo GIF with `docs/notes/launch-assets.md`; the README gets it then. Private vulnerability reporting on GitHub: switched on by the owner (2026-11-16). A real-app sample report comes in a later release — until then nothing about the owner's real apps goes into the repository.
 - Re-check the M9 list after publishing: the full-check command printed in reports (`npx @anjalipanwar/shipcheck <url>`) runs from a clean machine, and the report's links open.
 - **Done when:** `npx @anjalipanwar/shipcheck --help` works from a clean machine.
 

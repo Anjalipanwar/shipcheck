@@ -15,8 +15,6 @@ npx @anjalipanwar/shipcheck https://myapp.lovable.app
   - [Automatic checks only](examples/reports/buggy-app.md) — what `--no-ai` gives you without a key ([HTML version](examples/reports/buggy-app.html))
 - Free and open source (MIT). Runs on your computer. You bring your own AI key — a free one is enough.
 
-> **Before the first release:** version 0.1.0 is not on npm yet, so the `npx` command above does not work yet. Until then, see [Run it from the source code](#run-it-from-the-source-code).
-
 ## Quickstart (about 5 minutes)
 
 1. **Install Node.js** 22.12 or newer from [nodejs.org](https://nodejs.org) (the "LTS" download). To check what you have, type `node --version` in a terminal.
@@ -128,7 +126,7 @@ The password and "yes" are not accepted in this file, on purpose: a file like th
 ShipCheck can run in GitHub Actions, for example by hand before each launch. Copy [`examples/github-workflow.yml`](examples/github-workflow.yml) into your repository as `.github/workflows/shipcheck.yml` and follow the four steps at the top of that file. In short:
 
 ```yaml
-- uses: Anjalipanwar/shipcheck@main
+- uses: Anjalipanwar/shipcheck@v0
   with:
     url: https://myapp.lovable.app
     gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
@@ -180,7 +178,7 @@ ShipCheck is an automated pre-launch check. It is not a security audit and not a
 
 ## Run it from the source code
 
-For contributors, and for everyone until version 0.1.0 is on npm:
+For contributors, or to try the newest state before it is released:
 
 ```
 git clone https://github.com/Anjalipanwar/shipcheck.git

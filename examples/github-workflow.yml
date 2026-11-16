@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: Anjalipanwar/shipcheck@main
+      - uses: Anjalipanwar/shipcheck@v0
         with:
           url: https://myapp.lovable.app
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}

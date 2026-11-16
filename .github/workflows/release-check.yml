@@ -1,0 +1,55 @@
+name: Release check
+
+# Proves that the action works the way users call it — "uses: Anjalipanwar/shipcheck@v0" —
+# and not only from this repository's own files. Runs whenever the v0 tag is set or moved.
+# Automatic checks only: no AI key is used here.
+
+on:
+  push:
+    tags: [v0]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  from-the-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Only for the pretend app the check runs against; the action itself comes from the tag.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Start the pretend app
+        run: |
+          nohup npm run fixture > fixture.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail --output /dev/null http://127.0.0.1:4173/; then exit 0; fi
+            sleep 1
+          done
+          cat fixture.log
+          exit 1
+
+      - name: ShipCheck from the v0 tag
+        id: shipcheck
+        uses: Anjalipanwar/shipcheck@v0
+        with:
+          url: http://127.0.0.1:4173
+          no-ai: true
+          fail-on: none
+
+      - name: The planted bugs were found
+        env:
+          VERDICT: ${{ steps.shipcheck.outputs.verdict }}
+          EXIT_CODE: ${{ steps.shipcheck.outputs.exit-code }}
+          REPORT_DIR: ${{ steps.shipcheck.outputs.report-dir }}
+        run: |
+          echo "verdict: $VERDICT, exit code: $EXIT_CODE"
+          test "$EXIT_CODE" = "0"
+          test -s "$REPORT_DIR/report.html"
+          grep -q "Stripe secret key" "$REPORT_DIR/report.md"

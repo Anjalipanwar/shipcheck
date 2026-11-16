@@ -4,7 +4,9 @@ All notable changes to ShipCheck are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
-First version, not yet published.
+## [0.1.0] — 2026-11-16
+
+First version.
 
 ### Added
 

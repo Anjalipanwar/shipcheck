@@ -8,7 +8,7 @@ The page is ready in `docs-site/`: `index.html` (what ShipCheck is, quickstart l
 
 Publishing it makes the page public at `https://anjalipanwar.github.io/shipcheck/`. Steps:
 
-1. Tell Claude Code "add the Pages workflow". It adds a workflow that uploads `docs-site/` (GitHub's own `upload-pages-artifact` and `deploy-pages` actions); it is not in the repository yet, because it would fail until step 2 is done.
+1. The workflow that uploads `docs-site/` is in the repository since M10: `.github/workflows/pages.yml` (GitHub's own `upload-pages-artifact` and `deploy-pages` actions). It fails until step 2 is done.
 2. On GitHub: repository → **Settings** → **Pages** → under "Build and deployment", set **Source** to **GitHub Actions**.
 3. Push. Open the address above and check: the page loads, "See a sample report" opens the report, the two GitHub links work.
 4. Add the page's address to the repository's "About" box (the gear icon on the repository's front page → Website).

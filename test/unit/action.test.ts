@@ -62,10 +62,32 @@ describe('action.yml (SPEC §5.2)', () => {
   });
 });
 
+describe('release workflows', () => {
+  const workflow = (name: string): string => readRepoFile(`.github/workflows/${name}`);
+
+  it('the release check calls the action the way users do (@v0), without an AI key, with inputs that exist', () => {
+    const check = workflow('release-check.yml');
+    const used = withOf(check, 'Anjalipanwar/shipcheck@v0');
+    expect(Object.keys(used)).toEqual(['url', 'no-ai', 'fail-on']);
+    for (const name of Object.keys(used)) expect(actionInputs(action)).toContain(name);
+    expect(used.url).toContain('127.0.0.1'); // never a real website
+    expect(check).not.toMatch(/secrets\./);
+    expect(check).toMatch(/tags: \[v0\]/);
+  });
+
+  it('the project page workflow publishes docs-site/ and nothing else, with the two permissions Pages needs', () => {
+    const pages = workflow('pages.yml');
+    expect(pages).toMatch(/upload-pages-artifact@v\d+\n\s+with:\n\s+path: docs-site\//);
+    expect(pages).toMatch(/pages: write/);
+    expect(pages).toMatch(/id-token: write/);
+    expect(pages).toMatch(/^permissions:\n {2}contents: read$/m);
+  });
+});
+
 describe('examples/github-workflow.yml (the file users copy)', () => {
   it('uses the published action with inputs that exist, and takes secrets from repository secrets', () => {
-    // @main until the v0 tag exists (M10 checklist in docs/BUILD_PLAN.md: switch to @v0 then).
-    const used = withOf(example, 'Anjalipanwar/shipcheck@main');
+    // @v0: the tag that always points to the newest 0.x release.
+    const used = withOf(example, 'Anjalipanwar/shipcheck@v0');
     expect(Object.keys(used)).toEqual(['url', 'gemini-api-key', 'email', 'password']);
     for (const name of Object.keys(used)) expect(actionInputs(action)).toContain(name);
     expect(used['gemini-api-key']).toContain('${{ secrets.GEMINI_API_KEY }}');

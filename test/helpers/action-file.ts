@@ -42,7 +42,10 @@ export function runScripts(yaml: string): string[] {
 /** `key: value` pairs under the `with:` of the step that uses the given action. */
 export function withOf(yaml: string, uses: string): Record<string, string> {
   const lines = yaml.split('\n');
-  const at = lines.findIndex((line) => line.includes(`uses: ${uses}`));
+  // A comment that mentions the action is not the step.
+  const at = lines.findIndex(
+    (line) => !line.trim().startsWith('#') && line.includes(`uses: ${uses}`),
+  );
   const start = lines.findIndex((line, index) => index > at && /^\s*with:\s*$/.test(line));
   const result: Record<string, string> = {};
   if (at < 0 || start < 0) return result;
