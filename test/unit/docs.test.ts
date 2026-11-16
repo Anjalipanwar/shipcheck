@@ -86,8 +86,14 @@ describe('the README has what reports point to', () => {
   it('the project page links to README sections that exist, and to its own sample report', () => {
     const page = readRepoFile('docs-site/index.html');
     const linked = [...page.matchAll(/href="([^"]+)"/g)].map((match) => match[1] ?? '');
-    expect(linked).toContain('sample-report.html');
-    expect(existsSync(join(root, 'docs-site/sample-report.html'))).toBe(true);
+    // Each sample on the page is the very file in examples/reports/.
+    for (const [onPage, example] of [
+      ['sample-report.html', 'buggy-app.html'],
+      ['sample-report-full.html', 'buggy-app-full.html'],
+    ] as const) {
+      expect(linked).toContain(onPage);
+      expect(readRepoFile(`docs-site/${onPage}`)).toBe(readRepoFile(`examples/reports/${example}`));
+    }
     for (const link of linked.filter((href) => href.startsWith(`${REPO_URL}#`))) {
       expect(anchors, link).toContain(link.split('#')[1]);
     }
@@ -170,13 +176,38 @@ describe('the README’s examples are real', () => {
     }
   });
 
-  it('the sample report exists, is about the pretend app, and shows no unmasked secret', () => {
-    for (const file of ['examples/reports/buggy-app.md', 'examples/reports/buggy-app.html']) {
+  it('the README links both sample reports, and each says what kind of check it was', () => {
+    for (const [file, kind] of [
+      ['examples/reports/buggy-app-full.md', 'Full check (AI)'],
+      ['examples/reports/buggy-app.md', 'Automatic checks only (no AI)'],
+    ] as const) {
+      expect(readme).toContain(`(${file})`);
+      expect(readme).toContain(`(${file.replace('.md', '.html')})`);
+      const text = readFileSync(join(root, file), 'utf8');
+      expect(text).toContain(`**${kind}**`);
+      expect(text).toContain('**Sample report.**');
+    }
+    // The full-check sample was made by a real AI model, never by the tests' scripted stand-in.
+    expect(readFileSync(join(root, 'examples/reports/buggy-app-full.md'), 'utf8')).toMatch(
+      /\*\*AI model:\*\* \S+\/\S+ \(\d+ AI calls of 150 allowed\)/,
+    );
+  });
+
+  it('the sample reports exist, are about the pretend app, and show no unmasked secret', () => {
+    for (const file of [
+      'examples/reports/buggy-app.md',
+      'examples/reports/buggy-app.html',
+      'examples/reports/buggy-app-full.md',
+      'examples/reports/buggy-app-full.html',
+      'docs-site/sample-report.html',
+      'docs-site/sample-report-full.html',
+    ]) {
       const text = readFileSync(join(root, file), 'utf8');
       expect(text).toContain('ShipCheck');
       expect(text).toContain('http://127.0.0.1:4173/');
       expect(text).not.toMatch(/sk_live_[A-Za-z0-9]{16,}/);
       expect(text).not.toMatch(/\/Users\/|\/home\//);
+      expect(text).not.toMatch(/AIza[\w-]{10,}/); // no AI key
     }
   });
 });

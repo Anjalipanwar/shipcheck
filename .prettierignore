@@ -13,3 +13,4 @@ docs/KICKOFF_PROMPT.md
 # generated sample reports (npm run sample)
 examples/reports/
 docs-site/sample-report.html
+docs-site/sample-report-full.html

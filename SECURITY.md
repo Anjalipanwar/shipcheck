@@ -5,7 +5,7 @@
 Please do **not** open a public issue for a security problem. Report it privately through GitHub: on the repository page, open the **Security** tab and choose **Report a vulnerability**
 ([direct link](https://github.com/Anjalipanwar/shipcheck/security/advisories/new)).
 
-Please include what you found, how to reproduce it, and which version you used. ShipCheck is a small open-source project maintained in spare time, so an answer can take a little while; thank you for your patience.
+Please include what you found, how to reproduce it, and which version you used. I aim to reply within 7 days.
 
 Things that count as a security problem in ShipCheck:
 

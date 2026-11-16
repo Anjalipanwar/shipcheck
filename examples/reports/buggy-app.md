@@ -1,5 +1,7 @@
 # ShipCheck pre-launch report
 
+> **Sample report.** Made by ShipCheck from a pretend app with planted bugs. The screenshots named under “Evidence” are shown in the HTML version of this report ([buggy-app.html](buggy-app.html)); a real report folder also contains them as files.
+
 **Verdict: Automatic checks found issues** — 1 Blocker · 1 Major · 6 Minor · 1 Info
 
 Blocker = stops people using your app · Major = breaks or confuses many people · Minor = polish
@@ -7,8 +9,8 @@ Blocker = stops people using your app · Major = breaks or confuses many people 
 At least one is a blocker: fix it before you launch. ShipCheck did not use your app like a visitor, so a full check may find more.
 
 - **App:** http://127.0.0.1:4173/
-- **Date:** 15 November 2026, 23:58 UTC
-- **Duration:** 2 seconds
+- **Date:** 16 November 2026, 00:42 UTC
+- **Duration:** 3 seconds
 - **AI model:** None — automatic checks only
 - **ShipCheck version:** 0.1.0
 

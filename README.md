@@ -10,7 +10,9 @@ npx @anjalipanwar/shipcheck https://myapp.lovable.app
 
 **Only test apps you own or have permission to test.**
 
-- [See a sample report](examples/reports/buggy-app.md) (made from a pretend app with planted bugs, with the automatic checks only — a full check also reports on sign-up, log-in, the main feature and forms; the [HTML version](examples/reports/buggy-app.html) is what you get on your computer)
+- **Sample reports**, made from a pretend app with planted bugs (the HTML version is what opens on your computer):
+  - [Full check](examples/reports/buggy-app-full.md) — with an AI key: sign-up, log-in, main feature, forms, on desktop and phone, plus the automatic checks ([HTML version](examples/reports/buggy-app-full.html))
+  - [Automatic checks only](examples/reports/buggy-app.md) — what `--no-ai` gives you without a key ([HTML version](examples/reports/buggy-app.html))
 - Free and open source (MIT). Runs on your computer. You bring your own AI key — a free one is enough.
 
 > **Before the first release:** version 0.1.0 is not on npm yet, so the `npx` command above does not work yet. Until then, see [Run it from the source code](#run-it-from-the-source-code).

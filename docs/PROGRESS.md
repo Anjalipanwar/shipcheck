@@ -3,24 +3,24 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-16, M9 built as far as possible without the owner; waiting for the owner's answers
-- **Next up:** the owner's answers on M9 (list at the end of the M9 section): URL and consent for the real-app sample report, real-key runs, licence name, private security reporting, project page, push. M10 not started.
+- **Last updated:** 2026-11-16, M9 done (owner's decisions of 2026-11-16 applied)
+- **Next up:** M10 (release), after the owner's "go". The owner's npm user name is `anjalipanwar`, logged in on this Mac. M10 also publishes the project page (GitHub Pages) and ends with the owner timing the quickstart with the real `npx` command.
 
 ## Overview
 
-| Milestone                                            | Status                                 | Commit                           | Pushed                                                      |
-| ---------------------------------------------------- | -------------------------------------- | -------------------------------- | ----------------------------------------------------------- |
-| M0 — Scaffold                                        | done                                   | `b59adfc`                        | yes                                                         |
-| M1 — Fixture app with planted bugs                   | done                                   | `2d605ba`                        | yes                                                         |
-| M2 — Browser session, evidence, deterministic checks | done                                   | `6498102`                        | yes                                                         |
-| M3 — Report renderer and verdict                     | done                                   | `8e0b406`                        | yes                                                         |
-| M4 — AI flows with Stagehand + safety guard          | done                                   | `f5f7e63`                        | yes                                                         |
-| M5 — Mobile pass                                     | done                                   | `f168b9e`                        | yes                                                         |
-| M6 — AI judge, fix prompts, dedupe                   | done                                   | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
-| M7 — CLI polish                                      | done                                   | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
-| M8 — GitHub Action                                   | done                                   | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
-| M9 — Docs and launch assets                          | built, waiting for the owner's answers | see M9 section                   | no                                                          |
-| M10 — Release                                        | not started                            | —                                | —                                                           |
+| Milestone                                            | Status      | Commit                           | Pushed                                                      |
+| ---------------------------------------------------- | ----------- | -------------------------------- | ----------------------------------------------------------- |
+| M0 — Scaffold                                        | done        | `b59adfc`                        | yes                                                         |
+| M1 — Fixture app with planted bugs                   | done        | `2d605ba`                        | yes                                                         |
+| M2 — Browser session, evidence, deterministic checks | done        | `6498102`                        | yes                                                         |
+| M3 — Report renderer and verdict                     | done        | `8e0b406`                        | yes                                                         |
+| M4 — AI flows with Stagehand + safety guard          | done        | `f5f7e63`                        | yes                                                         |
+| M5 — Mobile pass                                     | done        | `f168b9e`                        | yes                                                         |
+| M6 — AI judge, fix prompts, dedupe                   | done        | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
+| M7 — CLI polish                                      | done        | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
+| M8 — GitHub Action                                   | done        | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
+| M9 — Docs and launch assets                          | done        | see M9 section                   | see M9 section                                              |
+| M10 — Release                                        | not started | —                                | —                                                           |
 
 ## Standing instructions from the owner
 
@@ -436,9 +436,9 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 ## M9 — Docs and launch assets
 
-- **Status:** built as far as possible without the owner; **not done** — open points below
-- **Commit:** `408200c` (missing-browser message, fixture names) and the M9 commit after it (hash in `git log`: it is the commit named "docs: README, licence, …")
-- **Pushed:** no — to be asked
+- **Status:** done (the real-app sample report is moved to a later release by the owner)
+- **Commits:** `408200c` (missing-browser message, fixture names), `9b76c8c` (M9), and the commit after it named "docs: full-check sample report, …" (owner's decisions applied)
+- **Pushed:** `5d197fd`, `408200c`, `9b76c8c` yes — CI green for `9b76c8c`: Node 22 in 6 min 44 s, Node 24 in 6 min 29 s, Action self-test in 58 s. The commit after them — to be asked
 
 **What was built**
 
@@ -454,23 +454,25 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 **Not verified:** the plan's own condition — "a non-technical person could follow the README quickstart in under 5 minutes" — needs a person; the `npx` command in the README cannot work before M10; how the issue templates and the project page look on GitHub.
 
-**Open, needs the owner**
+**Owner's decisions (2026-11-16)**
 
-1. Real-app sample report: the URL of the second app, and the owner's consent that its address, screenshots and findings become public in the repository for good.
-2. Real-key runs: one for that app; optionally one on the fixture for a full-check sample report.
-3. Licence name "Anjali Panwar" — confirm.
-4. `SECURITY.md` points to GitHub's private vulnerability reporting and names no response time; the reporting must be switched on in the repository settings (Settings → Code security → Private vulnerability reporting).
-5. Project page: publish it or not (steps in `docs/notes/launch-assets.md`). Demo GIF: record it or leave it out.
-6. The copied recipe names in the pushed history, and the planner fixture page as such: leave them, or change the page's theme and/or rewrite history (a force-push).
-7. Someone timing the quickstart.
-8. Push of the local commits after `e28acdf`.
+1. **Real-app sample report: not in this release.** The second app is still being worked on. M9 is finished without it; a real-app sample comes in a later release, and the owner decides about publishing consent then. Until then the earlier rule stands: nothing about the owner's real apps goes into the repository.
+2. **One real-key run on the fixture: approved and done** (29 AI calls of 150, 1 min 47 s, verdict "Not ready": 2 Blockers, 4 Major, 7 Minor, 1 Info). Result: `examples/reports/buggy-app-full.md` and `.html`, made by `npm run sample -- --full`. The README links both samples (full check first). Checked in both files (`.md` and `.html`): the AI key from `.env` is not in them, no path of this computer, the fake secret key masked, nothing of the shape of ShipCheck's generated sign-up password (`Sc-…-…!9a`), no "typed “…”" line; the list of single steps with typed values exists only in `report.json`, which is not part of the sample. By test for every sample file: no key of Google's shape, no home path, no unmasked secret key.
+3. **Licence name** "Anjali Panwar": confirmed.
+4. **Security reports:** `SECURITY.md` now says "I aim to reply within 7 days." **The owner switches on private vulnerability reporting on GitHub** (Settings → Code security) — remind the owner in the final summary.
+5. **Project page:** published with GitHub Pages as part of M10. **Demo GIF:** the owner records it after M10 with `docs/notes/launch-assets.md`; the README gets it then.
+6. **Pushed history:** stays as it is, no force-push. The recipe names are harmless and the meal-planner theme of the fixture page is fine.
+7. **Quickstart timing:** the owner times it after M10 with the real `npx` command. On the M10 checklist.
+8. **npm:** the owner has an account, user name `anjalipanwar`, logged in on this Mac.
+
+**Also changed with these decisions:** the Markdown versions of both samples start with a note that they are samples and that the screenshots are shown in the HTML version (the sample folder holds only the two report files); the project page links both samples; `test/unit/docs.test.ts` has 16 tests (new: both samples linked from the README and labelled with their kind of check, the full one made by a real AI model; no AI key in any sample).
 
 ---
 
 ## Needed from the owner for later milestones
 
-| When | What                                                                                                                          |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------- |
-| M8   | Optional `GEMINI_API_KEY` repo secret for the manual AI run in CI.                                                            |
-| M9   | One or two real apps the owner owns or may test, for sample reports. Confirmation of the LICENSE line "© 2026 Anjali Panwar". |
-| M10  | Owner runs `npm login` and `npm publish`. Check beforehand that the `@anjalipanwar` npm scope belongs to the owner.           |
+| When  | What                                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------------------- |
+| M8    | Optional `GEMINI_API_KEY` repo secret for the manual AI run in CI.                                                  |
+| Later | A real app the owner owns, for a real-app sample report (moved out of M9 by the owner on 2026-11-16).               |
+| M10   | Owner runs `npm publish` (logged in as `anjalipanwar`). Switch on GitHub Pages and private vulnerability reporting. |

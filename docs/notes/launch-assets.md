@@ -4,7 +4,7 @@ Two things from M9 that only the owner can do. Both are optional (first on the c
 
 ## 1. The project page (GitHub Pages)
 
-The page is ready in `docs-site/`: `index.html` (what ShipCheck is, quickstart link, link to the sample) and `sample-report.html` (the same report as `examples/reports/buggy-app.html`; `npm run sample` refreshes both).
+The page is ready in `docs-site/`: `index.html` (what ShipCheck is, quickstart link, links to the samples), `sample-report-full.html` and `sample-report.html` (the same reports as in `examples/reports/`; `npm run sample` refreshes the automatic one, `npm run sample -- --full` the full one — that one uses a real AI key).
 
 Publishing it makes the page public at `https://anjalipanwar.github.io/shipcheck/`. Steps:
 

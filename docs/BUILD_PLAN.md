@@ -60,7 +60,7 @@ Estimated total: ~2 focused days. Times are rough guides, not limits.
 
 ## M9 — Docs and launch assets (≈2h)
 - README per SPEC §11, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, issue templates.
-- `examples/reports/buggy-app.html` + slots for 2 real-app reports (owner supplies apps they own/have permission for).
+- `examples/reports/buggy-app.html` (automatic checks) and `buggy-app-full.html` (full check, real AI model). Real-app sample reports: moved to a later release by the owner (2026-11-16).
 - GitHub Pages project page (simple static `docs-site/` or Pages from `examples/`), with the sample report and quickstart.
 - Record a short demo GIF of a CLI run (or leave a clear TODO with exact steps for the owner).
 - **Every command and link shown in a report must work (owner decision 2026-11-15).** Checklist: the README has the section the report links to (`#get-a-free-ai-key`) and explains test accounts ("Add a test account (see the README)"); every flag named in a report's advice (`--flows`, `--max-minutes`, `--goal`, `--email`/`--password`) exists. Add a test that reads `README.md` and fails if a heading the report links to is missing, and one that checks each flag named in `ADVICE` against the CLI's options.
@@ -71,6 +71,9 @@ Estimated total: ~2 focused days. Times are rough guides, not limits.
 - Tag `v0.1.0` and move `v0` tag; GitHub release notes from CHANGELOG.
 - **Switch from `@main` to `@v0` (owner decision 2026-11-15):** once the `v0` tag exists, change `Anjalipanwar/shipcheck@main` to `Anjalipanwar/shipcheck@v0` in `examples/github-workflow.yml` and in the README (and the expected value in `test/unit/action.test.ts`), then test the example against the tag: copy it into a workflow, run it, and check the summary and the artifact.
 - Remove the "Before the first release" note from the README's top once the package is on npm (the section "Run it from the source code" stays, for contributors), and move the CHANGELOG's "Unreleased" entries under `0.1.0` with the date.
+- **Publish the project page with GitHub Pages (owner decision 2026-11-16):** add the Pages workflow for `docs-site/`, the owner sets Settings → Pages → Source to "GitHub Actions", then check the page, both sample reports and its links (steps in `docs/notes/launch-assets.md`).
+- **Owner times the quickstart (owner decision 2026-11-16):** after publishing, the owner follows the README quickstart with the real `npx` command and times it (target: under 5 minutes). This is M9's "done when", moved here because the command does not exist before the release.
+- **After M10, by the owner:** record the demo GIF with `docs/notes/launch-assets.md`; the README gets it then. Switch on private vulnerability reporting on GitHub (SECURITY.md relies on it). A real-app sample report comes in a later release — until then nothing about the owner's real apps goes into the repository.
 - Re-check the M9 list after publishing: the full-check command printed in reports (`npx @anjalipanwar/shipcheck <url>`) runs from a clean machine, and the report's links open.
 - **Done when:** `npx @anjalipanwar/shipcheck --help` works from a clean machine.
 
