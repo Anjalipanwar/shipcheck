@@ -3,7 +3,7 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-17, 0.1.1 prepared (audit fixes), not pushed, not published
+- **Last updated:** 2026-11-17, 0.1.1 prepared (audit fixes) and pushed, not published
 - **Next up:** the owner's answers in "0.1.1 — Audit fixes" → "Open, with the owner" (push, one real-key run, publish). Still open from M10: the GitHub release for `v0.1.0`, the timed quickstart, the "About" box, the demo GIF; later release: a real-app sample report.
 
 ## Overview
@@ -21,7 +21,7 @@ Updated at the end of every milestone. Read this at the start of every session.
 | M8 — GitHub Action                                   | done                    | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
 | M9 — Docs and launch assets                          | done                    | see M9 section                   | see M9 section                                              |
 | M10 — Release                                        | done                    | `38c5fec`                        | yes, with tags `v0.1.0`, `v0`                               |
-| 0.1.1 — Audit fixes                                  | prepared, not published | `a13978d` … release commit       | no (to be asked)                                            |
+| 0.1.1 — Audit fixes                                  | prepared, not published | `582adbf` … `18af27a`            | yes (by the owner)                                          |
 
 ## Standing instructions from the owner
 
@@ -515,8 +515,8 @@ The owner's own app (address and report kept outside this public repo, as agreed
 ## 0.1.1 — Audit fixes (2026-11-17)
 
 - **Status:** prepared, stopped before `npm publish` (owner's instruction). Version 0.1.1, CHANGELOG written, package packed and checked from an empty folder.
-- **Commits (all on `main`, none pushed):** `a13978d` A-01 redirects · `545a021` A-02/A-12 passwords in every spelling · `dfe666c` A-03 everyday-word passwords · `0ec24db` A-06 report folder · `72789e9` A-05 guard · `04d2977` A-16 README note · `5e92419` A-04 hard time limit · `17b6e7e` A-08 npm audit fix · `247af36` release: version, CHANGELOG, audit with status · then the commit that records this section.
-- **Pushed:** no — to be asked. CI can only go green after a push.
+- **Commits (all on `main`, none pushed):** `582adbf` A-01 redirects · `a0e1ac5` A-02/A-12 passwords in every spelling · `9cefbb3` A-03 everyday-word passwords · `717d9e8` A-06 report folder · `8c5ffcc` A-05 guard · `2d9e577` A-16 README note · `f7b1229` A-04 hard time limit · `3a50704` A-08 npm audit fix · `7935c5a` release: version, CHANGELOG, audit with status · `18af27a` docs: what the dependency fix reaches, PROGRESS. The owner re-stamped all of them with the GitHub noreply address before pushing, which changed their ids; the ids here are the new ones.
+- **Pushed:** yes, by the owner (2026-11-17), up to `18af27a`; the hash-fix docs commit after it — see below.
 
 **Owner's decisions (2026-11-17, on `docs/AUDIT-v0.1.0.md`)**
 
