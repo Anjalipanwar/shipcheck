@@ -545,7 +545,13 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 **How it was verified:** typecheck and lint clean; 663 unit tests and 211 real-browser tests pass (one earlier full run showed 9 failures with test times of 760–3,480 s — the computer had slept; the rerun passed). Release check exactly like 0.1.0: `npm pack` → 7 files, 256.5 kB, no path of this computer in `dist/`; installed into an empty folder with an empty npm cache; from there: `--version` → 0.1.1, `--help`, no key → exit 2 with the how-to, automatic checks on the fixture → exit 1 with the same counts as 0.1.0 (1 Blocker, 1 Major, 6 Minor, 1 Info) and a report with screenshots; and the fixes: an address that forwards to another site → exit 2, plain message, no report, the other site received nothing; `--password test` → full report; `/busy.html` with `--max-minutes 1` → stopped after 61 s with a partial report; `--out` pointing at a file → exit 2 with a plain message.
 
-**Not verified:** a real model call with the changed AI-SDK packages (needs a real key and the owner's approval; `npm run test:ai` on the fixture would cover it). CI on GitHub (needs a push). The published package (after the owner's `npm publish`).
+**After the owner's push (2026-11-17)**
+
+1. The owner set the repository's git email to the GitHub noreply address, re-stamped the 0.1.1 commits and pushed them. Checked: no commit after `v0.1.0` that was not already on GitHub before carries the Gmail address (`a5bd315` and `579b9be` were pushed earlier and stay as they are). The changed commit ids were updated in the audit and here (`5f37a27`, pushed by the builder at the owner's request).
+2. **CI for `5f37a27`:** green — CI 7 min 21 s (Node 22 and 24), Action self-test 45 s. The CI run for `18af27a` shows "cancelled": the workflow cancels an older run on the same branch when a newer push arrives (`cancel-in-progress`); `5f37a27` contains the same code.
+3. **Real-key run (owner's approval):** `npm run test:ai` once, on the local fixture only: 2 files, 16 tests passed, none skipped, 188 s — with `ai` 5.0.222, `@ai-sdk/google` 2.0.85, `@ai-sdk/provider-utils` 3.0.30 and Stagehand 3.7.3. So the downgraded AI packages work with a real model. No key-shaped text in the test output.
+
+**Not verified:** the published package (after the owner's `npm publish`).
 
 **Seen, not changed:** a run stopped by the time limit exits with the code its findings give — for the busy page that is 0, although almost nothing was tested. Every partial run has worked this way since 0.1.0 (exit codes follow `--fail-on`); the report and the summary say "partial". Worth a decision for v0.2.
 
@@ -555,8 +561,8 @@ They are "dangling" commit objects: stored only in this computer's `.git` folder
 
 **Open, with the owner**
 
-1. Push the 0.1.1 commits to `main` (and then watch CI)? A push may be refused by GitHub's email privacy setting, as before.
-2. Approve one real-key run on the fixture (`npm run test:ai`) to check the changed AI-SDK packages with a real model before publishing?
+1. Done: pushed, CI green, real-key run passed (see above).
+2. Decide whether a run stopped by the time limit gets its own exit code (3) in 0.1.1 or in v0.2.
 3. Publish: `npm publish` from a clean checkout of the release commit (`prepack` builds), then `npm view @anjalipanwar/shipcheck versions` first (staged publishing), then the empty-folder check with the real `npx` command, then set `v0.1.1` and move `v0`, and watch the "Release check" run.
 4. GitHub release for `v0.1.1` with the CHANGELOG section (owner's step).
 5. Deferred items for v0.2 are listed in the audit's Status column (among them: A-08 for `npx` users, removing the npm warnings, the backstop part of A-05, A-07, A-09, A-10, A-11).
