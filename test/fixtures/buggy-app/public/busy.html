@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Busy — NoteNest</title>
+  </head>
+  <body>
+    <h1>A page that never stops working</h1>
+    <p>Right after it has loaded, this page keeps the browser busy for good, like a very heavy page.</p>
+    <script>
+      addEventListener('load', () => setTimeout(() => { for (;;) {} }, 100));
+    </script>
+  </body>
+</html>

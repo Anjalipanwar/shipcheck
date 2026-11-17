@@ -87,3 +87,8 @@ try {
 }
 
 process.exitCode = exitCode;
+
+// Work cut off at the time limit (a model call still waiting for an answer, a page that keeps
+// the browser busy) may still hold the process open after the report is written (audit A-04).
+// The timer does not itself keep the process alive: a run that ends normally exits at once.
+setTimeout(() => process.exit(exitCode), 5000).unref();

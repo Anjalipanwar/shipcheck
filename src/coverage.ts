@@ -35,6 +35,13 @@ export class CoverageRecorder {
     this.marks.set(area, [...(this.marks.get(area) ?? []), outcome]);
   }
 
+  /** A copy (at the time limit, so that work still running cannot change the report). */
+  clone(): CoverageRecorder {
+    const copy = new CoverageRecorder();
+    for (const [area, outcomes] of this.marks) copy.marks.set(area, [...outcomes]);
+    return copy;
+  }
+
   /** Nothing was tested, whatever was marked before (e.g. the home page did not load). */
   failAll(note: string): void {
     this.marks.clear();

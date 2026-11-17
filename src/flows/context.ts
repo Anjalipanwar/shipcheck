@@ -13,6 +13,7 @@ import {
   type Gap,
   type Observation,
 } from './types.js';
+import { minutesText } from '../config.js';
 import { reasonOf } from '../coverage.js';
 import { ADVICE } from '../report/present.js';
 
@@ -107,7 +108,7 @@ export class FlowContext {
     if (Date.now() >= this.deps.deadline) {
       throw new StopFlow(
         'budget',
-        `${this.label} — the time limit of ${this.config.maxMinutes} minutes was reached`,
+        `${this.label} — the time limit of ${minutesText(this.config.maxMinutes)} was reached`,
       );
     }
     if (this.steps >= MAX_FLOW_STEPS) {
@@ -130,7 +131,7 @@ export class FlowContext {
         'budget',
         error.limit === 'calls'
           ? `${this.label} — the limit of ${this.deps.budget.maxCalls} AI calls for one run was reached`
-          : `${this.label} — the time limit of ${this.config.maxMinutes} minutes was reached`,
+          : `${this.label} — the time limit of ${minutesText(this.config.maxMinutes)} was reached`,
       );
     }
     throw error;

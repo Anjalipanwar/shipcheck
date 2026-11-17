@@ -2,7 +2,7 @@ import { LlmBudget, type BudgetSummary } from './ai/budget.js';
 import { createStagehandDriver, freePort, type AiDriver } from './ai/driver.js';
 import type { ModelChoice } from './ai/models.js';
 import { DESKTOP, MOBILE, type DevicePreset } from './browser/devices.js';
-import { Evidence, type Screenshot } from './browser/evidence.js';
+import { Evidence, type EvidenceEvent, type Screenshot } from './browser/evidence.js';
 import { isRiskyUrl } from './browser/guard.js';
 import { BrowserSession, gotoWithRetry, type DevicePage } from './browser/session.js';
 import { checkA11y, runAxe, type A11yViolation } from './checks/a11y.js';
@@ -25,7 +25,7 @@ import { checkPerformance } from './checks/performance.js';
 import { checkSecrets, type SecretSource } from './checks/secrets.js';
 import { checkSeo } from './checks/seo.js';
 import type { CheckResult } from './checks/types.js';
-import { ConfigError, type Config } from './config.js';
+import { ConfigError, minutesText, type Config } from './config.js';
 import { judge } from './ai/judge.js';
 import {
   CoverageRecorder,
@@ -44,7 +44,13 @@ import { signupFlow } from './flows/signup.js';
 import type { FlowDeps, FlowName, FlowResult, Observation, SharedState } from './flows/types.js';
 import { ADVICE, AREA_LABEL, NEEDS_FULL_CHECK } from './report/present.js';
 import { redactDeep } from './report/write.js';
-import { makeFinding, type CoverageArea, type Finding, type Report } from './report/schema.js';
+import {
+  makeFinding,
+  type ActionLogEntry,
+  type CoverageArea,
+  type Finding,
+  type Report,
+} from './report/schema.js';
 import { computeVerdict, countBySeverity, rankFindings } from './report/verdict.js';
 import { VERSION } from './version.js';
 
@@ -90,7 +96,26 @@ class Collector {
     this.passed.push(...result.passed);
     this.notTested.push(...result.notTested);
   }
+
+  /**
+   * At the time limit: a copy of everything collected so far, for the report. The original is
+   * frozen, so work that is still stuck fails at its next write instead of changing the report.
+   */
+  detach(): Collector {
+    const copy = new Collector();
+    copy.findings.push(...this.findings);
+    copy.passed.push(...this.passed);
+    copy.notTested.push(...this.notTested);
+    copy.partial = this.partial;
+    Object.freeze(this.findings);
+    Object.freeze(this.passed);
+    Object.freeze(this.notTested);
+    return copy;
+  }
 }
+
+/** Closing the browser and the AI tester may take this long at most. */
+const CLOSE_TIMEOUT_MS = 10_000;
 
 function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -169,7 +194,12 @@ export async function runShipCheck(
 ): Promise<RunResult> {
   const startedAt = new Date();
   const deadline = startedAt.getTime() + config.maxMinutes * 60_000;
-  const progress = hooks.progress ?? (() => undefined);
+  const say = hooks.progress ?? (() => undefined);
+  /** Set at the time limit (audit A-04): from then on, nothing that is still running is shown. */
+  let stopped = false;
+  const progress = (line: string): void => {
+    if (!stopped) say(line);
+  };
   const evidence = new Evidence();
   evidence.protect(config.password);
   evidence.protect(options.model?.apiKey);
@@ -208,7 +238,7 @@ export async function runShipCheck(
       mark(blocked('the time limit was reached', ADVICE.time));
       collector.partial = true;
       collector.notTested.push(
-        `${label} — the time limit of ${config.maxMinutes} minutes was reached`,
+        `${label} — the time limit of ${minutesText(config.maxMinutes)} was reached`,
       );
       progress(`${label}… skipped (time limit reached)`);
       return;
@@ -243,14 +273,17 @@ export async function runShipCheck(
     ...(cdpPort ? { cdpPort } : {}),
   });
   let ai: AiDriver | undefined;
-  let landingLoaded: boolean;
-  try {
+  let landingLoaded = false;
+  /** True once the attempt to open the home page is over, whether it loaded or not. */
+  let landingDone = false;
+  const work = async (): Promise<void> => {
     const desktop = await session.open(DESKTOP);
     const userAgent = session.userAgentFor(DESKTOP);
     const fetchOptions = { lock: session.lock, userAgent };
 
     const landing = await openLanding(desktop, config.url, evidence, collector, progress, session);
     landingLoaded = landing !== undefined;
+    landingDone = true;
     if (landing) {
       const { facts, headers, finalUrl } = landing;
       const origin = new URL(finalUrl).origin;
@@ -530,13 +563,59 @@ export async function runShipCheck(
     collector.passed.splice(0, collector.passed.length, ...worked);
     if (driver)
       progress(`Writing up the findings… ${judged.reworded > 0 ? '✓' : 'kept as recorded'}`);
+  };
+
+  // The hard time limit (SPEC §7.4, audit A-04). The run's work races a timer at the deadline.
+  // When time is up, the report is made from what was collected so far, and the browser is
+  // closed — which also ends any look into a page that keeps the browser busy for good.
+  let timer: NodeJS.Timeout | undefined;
+  const timeUp = new Promise<'time-up'>((resolve) => {
+    timer = setTimeout(() => resolve('time-up'), Math.max(0, deadline - Date.now()));
+  });
+  let kept: Kept;
+  try {
+    const running = work();
+    running.catch(() => undefined); // after the time limit, its failures no longer matter
+    const outcome = await Promise.race([running.then(() => 'done' as const), timeUp]);
+    if (outcome === 'time-up') {
+      kept = {
+        collector: collector.detach(),
+        coverage: coverage.clone(),
+        events: [...evidence.events],
+        actionLog: [...evidence.actionLog],
+        screenshots: [...evidence.screenshots],
+      };
+      stopped = true;
+      say(
+        `Time limit of ${minutesText(config.maxMinutes)} reached — stopping and writing the report with what was checked so far`,
+      );
+    } else {
+      kept = {
+        collector,
+        coverage,
+        events: evidence.events,
+        actionLog: evidence.actionLog,
+        screenshots: evidence.screenshots,
+      };
+    }
   } finally {
-    await ai?.close();
-    await session.close();
+    clearTimeout(timer);
+    await withTimeout(Promise.resolve(ai?.close()), CLOSE_TIMEOUT_MS).catch(() => undefined);
+    await withTimeout(session.close(), CLOSE_TIMEOUT_MS).catch(() => undefined);
+  }
+
+  if (stopped) {
+    kept.collector.partial = true;
+    kept.collector.notTested.push(
+      `${landingDone ? 'The rest of the check' : 'Everything'} — the time limit of ${minutesText(config.maxMinutes)} was reached, so ShipCheck stopped and wrote this report with what it had checked so far`,
+    );
+    // The judge without AI: no evidence → no finding, near-duplicates merged (no time to reword).
+    const judged = await judge(kept.collector.findings);
+    kept.collector.findings.splice(0, kept.collector.findings.length, ...judged.findings);
   }
 
   if (config.noAi) {
-    collector.notTested.push(
+    kept.collector.notTested.push(
       `Signing up, logging in, the main feature and forms, on desktop and on a phone — these need the full check (this run was automatic checks only)${config.skipMobile ? '' : '. The phone layout was checked'}`,
     );
   } else {
@@ -544,24 +623,31 @@ export async function runShipCheck(
       (name) => !config.flows.includes(name),
     );
     if (left.length > 0) {
-      collector.notTested.push(
+      kept.collector.notTested.push(
         `${left.map((name) => FLOW_LABEL[name]).join(', ')} — left out with --flows`,
       );
     }
   }
   if (config.skipMobile) {
-    collector.notTested.push('The phone-sized pass — left out with --skip-mobile');
+    kept.collector.notTested.push('The phone-sized pass — left out with --skip-mobile');
   }
-  collector.notTested.push(
-    ...describeBlocking(evidence.events, separateShipCheckBlocking(evidence.events).ours.length),
+  kept.collector.notTested.push(
+    ...describeBlocking(kept.events, separateShipCheckBlocking(kept.events).ours.length),
   );
   const llm = useAi ? budget.summary() : undefined;
 
-  if (!landingLoaded) {
-    coverage.failAll(withAdvice('the home page did not load', ADVICE.fixHome));
+  if (stopped && !landingDone) {
+    kept.coverage.failAll(
+      withAdvice(
+        'the time limit was reached before the home page had finished loading',
+        ADVICE.time,
+      ),
+    );
+  } else if (!landingLoaded) {
+    kept.coverage.failAll(withAdvice('the home page did not load', ADVICE.fixHome));
   }
-  const findings = rankFindings(collector.findings);
-  const covered = coverage.build(findings, (area) => {
+  const findings = rankFindings(kept.collector.findings);
+  const covered = kept.coverage.build(findings, (area) => {
     if (USER_AREAS.includes(area) && config.noAi) {
       return { state: 'not-tested', note: NEEDS_FULL_CHECK };
     }
@@ -582,25 +668,34 @@ export async function runShipCheck(
       model: useAi ? (options.model?.stagehandModel ?? 'scripted') : null,
       shipcheckVersion: VERSION,
       mode,
-      partial: collector.partial,
+      partial: kept.collector.partial,
       llmCalls: llm?.total ?? 0,
       ...(llm ? { llmCallsByFlow: llm.byFlow, llmCallLimit: llm.max } : {}),
     },
     verdict: computeVerdict(findings, { mode, coverage: covered }),
     counts: countBySeverity(findings),
     findings,
-    passed: collector.passed,
-    notTested: collector.notTested,
+    passed: kept.collector.passed,
+    notTested: kept.collector.notTested,
     coverage: covered,
-    actionLog: evidence.actionLog,
+    actionLog: kept.actionLog,
   };
   return {
     // Scrubbed here, so that every consumer — files, step summary, terminal — is safe (§7.6).
     report: redactDeep(report, (text) => evidence.redact(text)),
-    screenshots: evidence.screenshots,
+    screenshots: kept.screenshots,
     redact: (text) => evidence.redact(text),
     ...(llm ? { llm } : {}),
   };
+}
+
+/** What the report is made from: everything, or what was collected when time ran out. */
+interface Kept {
+  collector: Collector;
+  coverage: CoverageRecorder;
+  events: EvidenceEvent[];
+  actionLog: ActionLogEntry[];
+  screenshots: Screenshot[];
 }
 
 interface Landing {

@@ -439,19 +439,23 @@ describe('covered button in a full run (owner decision 2026-11-15)', () => {
 });
 
 describe('coverage when the time runs out', () => {
-  it('checks the time limit stopped are “Not tested: the time limit was reached”, with what to do, and the verdict stays neutral', async () => {
+  it('a limit too short to open the home page: every area is “Not tested: the time limit was reached”, with what to do, no Blocker, and the verdict stays neutral (hard stop, audit A-04)', async () => {
     const config = loadConfig(app.url, { ai: false, yes: true }, {});
-    // The smallest --max-minutes is 1; a run this short can only open the home page.
+    // The smallest --max-minutes is 1; 0.001 minutes (60 ms) is over before the home page is.
+    const started = Date.now();
     const result = await runShipCheck({ ...config, maxMinutes: 0.001 });
-    const notes = Object.fromEntries(result.report.coverage.map((e) => [e.area, e.note]));
-    const advice = 'the time limit was reached. Run ShipCheck again with a higher --max-minutes.';
-    expect(notes.seo).toBe(advice);
-    expect(notes.links).toBe(advice);
-    expect(notes.security).toMatch(/the time limit was reached/);
-    expect(notes['phone-layout']).toBe(
-      'ShipCheck ran out of time before this part. Run ShipCheck again with a higher --max-minutes.',
+    expect(Date.now() - started).toBeLessThan(15_000); // the limit, plus closing the browser
+    const notes = new Set(result.report.coverage.map((e) => e.note));
+    expect([...notes]).toEqual([
+      'the time limit was reached before the home page had finished loading. Run ShipCheck again with a higher --max-minutes.',
+    ]);
+    expect(new Set(result.report.coverage.map((e) => e.state))).toEqual(new Set(['not-tested']));
+    // Running out of time is not the app's fault.
+    expect(result.report.findings.map((f) => f.rule)).not.toContain('landing/not-loading');
+    expect(result.report.meta.partial).toBe(true);
+    expect(result.report.notTested).toContain(
+      'Everything — the time limit of 0.001 minutes was reached, so ShipCheck stopped and wrote this report with what it had checked so far',
     );
-    expect(result.report.coverage.find((e) => e.area === 'seo')?.state).toBe('not-tested');
     expect(result.report.verdict).not.toBe('ready');
     expect(() => ReportSchema.parse(result.report)).not.toThrow();
   });

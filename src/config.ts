@@ -200,3 +200,6 @@ export function loadConfig(
   }
   return result.data;
 }
+
+/** "1 minute", "10 minutes". */
+export const minutesText = (n: number): string => `${n} ${n === 1 ? 'minute' : 'minutes'}`;
