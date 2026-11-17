@@ -3,25 +3,25 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-17, 0.1.1 prepared (audit fixes) and pushed, not published
-- **Next up:** the owner's answers in "0.1.1 — Audit fixes" → "Open, with the owner" (push, one real-key run, publish). Still open from M10: the GitHub release for `v0.1.0`, the timed quickstart, the "About" box, the demo GIF; later release: a real-app sample report.
+- **Last updated:** 2026-11-17, 0.1.1 released: on npm (`latest`), tags `v0.1.1` and `v0` on `69036d5`, release check green
+- **Next up:** nothing is in progress. Open with the owner: the GitHub release for `v0.1.1` (and `v0.1.0`), the timed quickstart, the "About" box, the demo GIF; v0.2 items in the audit's Status column; later release: a real-app sample report.
 
 ## Overview
 
-| Milestone                                            | Status                  | Commit                           | Pushed                                                      |
-| ---------------------------------------------------- | ----------------------- | -------------------------------- | ----------------------------------------------------------- |
-| M0 — Scaffold                                        | done                    | `b59adfc`                        | yes                                                         |
-| M1 — Fixture app with planted bugs                   | done                    | `2d605ba`                        | yes                                                         |
-| M2 — Browser session, evidence, deterministic checks | done                    | `6498102`                        | yes                                                         |
-| M3 — Report renderer and verdict                     | done                    | `8e0b406`                        | yes                                                         |
-| M4 — AI flows with Stagehand + safety guard          | done                    | `f5f7e63`                        | yes                                                         |
-| M5 — Mobile pass                                     | done                    | `f168b9e`                        | yes                                                         |
-| M6 — AI judge, fix prompts, dedupe                   | done                    | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
-| M7 — CLI polish                                      | done                    | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
-| M8 — GitHub Action                                   | done                    | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
-| M9 — Docs and launch assets                          | done                    | see M9 section                   | see M9 section                                              |
-| M10 — Release                                        | done                    | `38c5fec`                        | yes, with tags `v0.1.0`, `v0`                               |
-| 0.1.1 — Audit fixes                                  | prepared, not published | `582adbf` … `18af27a`            | yes (by the owner)                                          |
+| Milestone                                            | Status | Commit                           | Pushed                                                      |
+| ---------------------------------------------------- | ------ | -------------------------------- | ----------------------------------------------------------- |
+| M0 — Scaffold                                        | done   | `b59adfc`                        | yes                                                         |
+| M1 — Fixture app with planted bugs                   | done   | `2d605ba`                        | yes                                                         |
+| M2 — Browser session, evidence, deterministic checks | done   | `6498102`                        | yes                                                         |
+| M3 — Report renderer and verdict                     | done   | `8e0b406`                        | yes                                                         |
+| M4 — AI flows with Stagehand + safety guard          | done   | `f5f7e63`                        | yes                                                         |
+| M5 — Mobile pass                                     | done   | `f168b9e`                        | yes                                                         |
+| M6 — AI judge, fix prompts, dedupe                   | done   | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
+| M7 — CLI polish                                      | done   | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
+| M8 — GitHub Action                                   | done   | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
+| M9 — Docs and launch assets                          | done   | see M9 section                   | see M9 section                                              |
+| M10 — Release                                        | done   | `38c5fec`                        | yes, with tags `v0.1.0`, `v0`                               |
+| 0.1.1 — Audit fixes                                  | done   | `582adbf` … `69036d5`            | yes, with tags `v0.1.1`, `v0`                               |
 
 ## Standing instructions from the owner
 
@@ -514,7 +514,7 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 ## 0.1.1 — Audit fixes (2026-11-17)
 
-- **Status:** prepared, stopped before `npm publish` (owner's instruction). Version 0.1.1, CHANGELOG written, package packed and checked from an empty folder.
+- **Status:** done — `@anjalipanwar/shipcheck@0.1.1` is on npm (published by the owner), tags `v0.1.1` and `v0` point to `69036d5`, release check green.
 - **Commits (all on `main`, none pushed):** `582adbf` A-01 redirects · `a0e1ac5` A-02/A-12 passwords in every spelling · `9cefbb3` A-03 everyday-word passwords · `717d9e8` A-06 report folder · `8c5ffcc` A-05 guard · `2d9e577` A-16 README note · `f7b1229` A-04 hard time limit · `3a50704` A-08 npm audit fix · `7935c5a` release: version, CHANGELOG, audit with status · `18af27a` docs: what the dependency fix reaches, PROGRESS. The owner re-stamped all of them with the GitHub noreply address before pushing, which changed their ids; the ids here are the new ones.
 - **Pushed:** yes, by the owner (2026-11-17), up to `18af27a`; the hash-fix docs commit after it — see below.
 
@@ -558,7 +558,15 @@ The owner's own app (address and report kept outside this public repo, as agreed
 - **Deliberate breaks, each confirmed to change the file:** no code 3 → 3 unit tests and the command test fail; time limit winning over problems → 2 unit tests; `--fail-on none` giving 3 → 3 unit tests; field not written → the 60 ms test; Action message removed → the Action test.
 - **Verified:** typecheck and lint clean; 673 unit tests and 214 browser tests pass. Release check from an empty folder with an empty npm cache (7 files, 257.1 kB, no local paths): `--version` 0.1.1, `--help`, no key → 2, automatic checks → 1 with the usual counts and no `stoppedBy`, forwarding address → 2 (the other site received nothing), `--password test` → report, busy page with `--max-minutes 1` → **3** after 60 s with `stoppedBy: "time-limit"`, the same with `--fail-on none` → 0, `--out` a file → 2. Real-key run `npm run test:ai` on the fixture: 16 of 16 passed, none skipped, no key-shaped text in the output. "Problems found and time ran out → 1" is covered by unit tests only (no fixture page has a Blocker and keeps the browser busy).
 
-**Not verified:** the published package (after the owner's `npm publish`).
+**After the publish (2026-11-17)**
+
+1. **Publish:** the owner published 0.1.1 at 18:16:21 UTC. A first check from here, right after the owner's message, still showed only `0.0.0-stage` and `0.1.0` on the registry (also with an empty cache, and `npx …@0.1.1` gave `ETARGET`) — no tag was set then. Once 0.1.1 was public: registry `latest` = 0.1.1, 7 files, shasum `df68bd4b64e90815fee056cd115bada26e2a1de1`, `gitHead` `69036d5`. The published tarball is byte-identical to `npm pack` of `69036d5` (same shasum, `diff -r` of the contents empty).
+2. **CI on `69036d5` before tagging:** green (CI 6 min 54 s, Action self-test 65 s).
+3. **Empty-folder `npx` check with the published package** (empty folder, empty npm cache, no key, `npx @anjalipanwar/shipcheck@0.1.1`): `--help` works, `--version` → 0.1.1; npm printed one warning on that first run (`deprecated node-domexception`), which the README mentions. No key → 2 with the how-to; automatic checks on the fixture → 1 (1 Blocker, 1 Major, 6 Minor, 1 Info, 2 screenshots, no `stoppedBy`); an address forwarding to another site → 2, no report, the other site received nothing; `--password test` → report, no crash; busy page with `--max-minutes 1` → 3 after 61 s with `stoppedBy: "time-limit"`; `--out` a file → 2.
+4. **Tags:** annotated, as before, tagger the noreply address: `v0.1.1` ("ShipCheck 0.1.1") created on `69036d5` and pushed; `v0` moved from `38c5fec` to `69036d5` (force-push of that tag only). `v0.1.0` unchanged on `38c5fec`.
+5. **Release check (the example against the tag):** green in 92 s — `Anjalipanwar/shipcheck@v0` ran against the fixture, the planted bugs were found, and the `shipcheck-report` artifact (103 kB) was attached.
+
+**Open, with the owner:** the GitHub release for `v0.1.1` with the CHANGELOG section (owner's step); issue #1 stays open for v0.2 (the warnings come from inside Stagehand).
 
 **Changed after the owner's decision (see "Exit code 3" below):** a run stopped by the time limit used to exit with the code its findings gave — 0 for the busy page, although almost nothing was tested.
 
