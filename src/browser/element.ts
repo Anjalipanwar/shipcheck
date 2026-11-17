@@ -30,6 +30,11 @@ const FactsSchema = z.object({
   href: z.string(),
   formSubmitText: z.string(),
   formHasPaymentField: z.boolean(),
+  icons: z.string(),
+  toggle: z.boolean(),
+  formFields: z
+    .array(z.object({ tag: z.string(), type: z.string(), keys: z.string(), label: z.string() }))
+    .max(40),
 });
 
 /*
@@ -55,14 +60,63 @@ const FACTS_SCRIPT = `((selector) => {
   const paymentField = 'input[autocomplete^="cc-"],input[name*="card" i],input[id*="card" i],' +
     'input[name*="cvc" i],input[name*="cvv" i],input[id*="cvc" i],input[id*="cvv" i]';
   // A click on an icon inside a button counts as a click on the button.
-  const control = element.closest(
-    'button,a[href],[role="button"],[role="link"],[role="menuitem"],summary') ?? element;
+  const realControl = element.closest(
+    'button,a[href],[role="button"],[role="link"],[role="menuitem"],summary');
+  const control = realControl ?? element;
+  // What names an icon-only button: labels on the parts inside it, and the icons' own names
+  // (audit A-05). Only inside a real button or link, never inside a large container.
+  const inner = realControl ? [...control.querySelectorAll('*')].slice(0, 200) : [];
+  const innerLabels = inner.flatMap((node) => [attr(node, 'aria-label'), attr(node, 'title'),
+    node.tagName === 'IMG' ? attr(node, 'alt') : '',
+    node.tagName.toLowerCase() === 'title' ? textOf(node) : '']);
+  const ICON_PREFIX = /^(?:lucide|fa|fas|far|fal|fab|bi|mdi|ri|ti|tabler|icon|ph|heroicon|heroicons|feather|ion|glyphicon|octicon|la|las)-(.+)$/;
+  const ICON_STYLE = /^(?:solid|regular|light|thin|duotone|brands|sharp|outline|filled|lg|sm|xs|xl|fw|spin|pulse|border|\\d+x)$/;
+  const iconNames = [];
+  for (const node of [control, ...inner]) {
+    for (const token of String(node.getAttribute('class') ?? '').split(/\\s+/)) {
+      const prefixed = ICON_PREFIX.exec(token);
+      const suffixed = /^(.+)-icon$/.exec(token);
+      const found = prefixed ? prefixed[1] : suffixed ? suffixed[1] : '';
+      if (found && !ICON_STYLE.test(found)) iconNames.push(found);
+    }
+    for (const name of ['data-icon', 'data-lucide', 'data-feather', 'icon', 'name']) {
+      if (node !== control && ['svg', 'i', 'span', 'ion-icon', 'iconify-icon'].includes(
+        node.tagName.toLowerCase())) iconNames.push(attr(node, name));
+    }
+    if (node.tagName.toLowerCase() === 'use') {
+      const ref = attr(node, 'href') || attr(node, 'xlink:href');
+      iconNames.push(ref.replace(/^.*#/, '').replace(/^icon-/, ''));
+    }
+    if (node.tagName === 'IMG' && node !== control) {
+      const file = /([^/?#]+?)(?:\\.(?:svg|png|webp|gif))?(?:[?#].*)?$/i.exec(attr(node, 'src'));
+      if (file && /icon|ico-|\\.svg/i.test(attr(node, 'src'))) iconNames.push(file[1]);
+    }
+  }
+  const idsOf = (node) => [attr(node, 'name'), clean(node.id), attr(node, 'data-testid'),
+    attr(node, 'data-test'), attr(node, 'data-test-id'), attr(node, 'data-cy'),
+    attr(node, 'data-action')];
+  const toggle = control.tagName === 'SUMMARY' || ['aria-expanded', 'aria-haspopup',
+    'aria-controls'].some((name) => control.hasAttribute(name)) ||
+    /menu|burger|nav-?toggle|navbar-toggler|dropdown|disclosure/i.test(
+      String(control.getAttribute('class') ?? '') + ' ' + control.id);
   const form = element.closest('form');
   const labels = [...(element.labels ?? [])].map(textOf);
   const labelledBy = (attr(control, 'aria-labelledby') + ' ' + attr(element, 'aria-labelledby'))
     .split(' ').filter(Boolean).map((id) => textOf(document.getElementById(id)));
   const isInputButton = element.tagName === 'INPUT' &&
     ['submit', 'button', 'reset'].includes(element.type);
+  const formFields = form
+    ? [...form.querySelectorAll('input,textarea,select')].filter((node) =>
+        !['hidden', 'submit', 'button', 'reset', 'image'].includes(node.type)).slice(0, 40)
+        .map((node) => ({
+          tag: node.tagName.toLowerCase(),
+          type: clean(node.type).toLowerCase(),
+          keys: [attr(node, 'name'), clean(node.id), attr(node, 'autocomplete')]
+            .filter(Boolean).join(' '),
+          label: [...(node.labels ?? [])].map(textOf).join(' ') || attr(node, 'aria-label') ||
+            attr(node, 'placeholder'),
+        }))
+    : [];
   const submitText = form
     ? [...form.querySelectorAll(
         'button:not([type="button"]):not([type="reset"]),input[type="submit"]')]
@@ -74,13 +128,16 @@ const FACTS_SCRIPT = `((selector) => {
     text: textOf(control),
     label: [attr(control, 'aria-label'), attr(element, 'aria-label'), attr(control, 'title'),
       attr(element, 'title'), attr(element, 'placeholder'),
-      isInputButton ? clean(element.value) : '', ...labels, ...labelledBy]
-      .filter(Boolean).join(' | '),
-    name: [attr(element, 'name'), clean(element.id), attr(element, 'autocomplete')]
-      .filter(Boolean).join(' '),
+      isInputButton ? clean(element.value) : '', ...labels, ...labelledBy, ...innerLabels]
+      .filter(Boolean).join(' | ').slice(0, 600),
+    name: [...new Set([attr(element, 'autocomplete'), ...idsOf(element),
+      ...(control === element ? [] : idsOf(control))].filter(Boolean))].join(' '),
     href: control.href ? String(control.href) : '',
     formSubmitText: clean(submitText),
     formHasPaymentField: form ? form.querySelector(paymentField) !== null : false,
+    icons: [...new Set(iconNames.map(clean).filter(Boolean))].join(' ').slice(0, 300),
+    toggle,
+    formFields,
   };
 })`;
 

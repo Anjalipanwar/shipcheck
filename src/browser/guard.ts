@@ -89,7 +89,7 @@ export function isRiskyUrl(candidate: string): boolean {
  * It judges the real element on the page — never only the AI's own description of it.
  * ---------------------------------------------------------------------------------------- */
 
-export type ForbiddenKind = 'destructive' | 'payment' | 'outward' | 'account-change';
+export type ForbiddenKind = 'destructive' | 'payment' | 'outward' | 'account-change' | 'log-out';
 
 export type GuardVerdict =
   | { allowed: true }
@@ -104,7 +104,10 @@ export interface ElementFacts {
   text: string;
   /** Accessible name parts: aria-label, title, label text, placeholder, value of input buttons. */
   label: string;
-  /** name, id and autocomplete attributes, space-separated. */
+  /**
+   * name, id and autocomplete of the element, plus id, name and test ids (data-testid, data-test,
+   * data-cy, data-action) of the button or link it sits in, space-separated.
+   */
   name: string;
   /** Link address, if the element is or sits inside a link. */
   href: string;
@@ -112,6 +115,26 @@ export interface ElementFacts {
   formSubmitText: string;
   /** True if the same form contains a card number, expiry or security code field. */
   formHasPaymentField: boolean;
+  /**
+   * Names of the icons inside the button (e.g. "trash-2 log-out"): from icon class names
+   * (lucide-trash-2, fa-paper-plane), data-icon attributes, sprite references (#icon-send) and
+   * image file names. Icon-only buttons often carry their meaning only here (audit A-05).
+   */
+  icons: string;
+  /** True for a button that opens or closes something (a menu, a dropdown, a details box). */
+  toggle: boolean;
+  /** The fields of the form the element belongs to (to tell a contact form from a chat box). */
+  formFields: FormField[];
+}
+
+/** One field of a form, as read from the page. */
+export interface FormField {
+  tag: string;
+  type: string;
+  /** name, id and autocomplete, space-separated. */
+  keys: string;
+  /** Label text, aria-label or placeholder. */
+  label: string;
 }
 
 /** An action as proposed by the AI (Stagehand's observe result). */
@@ -139,8 +162,16 @@ const FORBIDDEN: readonly [ForbiddenKind, RegExp][] = [
         'cancel (my |your |the |this )?(subscription|plan|membership|account|order|booking|trial)|' +
         'reset (all|data|account|everything)|leave (the |this )?(team|workspace|organi[sz]ation|group)|' +
         'löschen|loeschen|entfernen|kündigen|kuendigen|abbestellen|deaktivieren|zurücksetzen|' +
-        'zuruecksetzen|widerrufen|stornieren|konto schließen|konto schliessen|abo beenden',
+        'zuruecksetzen|widerrufen|stornieren|konto schließen|konto schliessen|abo beenden|' +
+        // Audit A-05: archiving, binning, discarding, disabling, disconnecting, banning.
+        'archiv(e|es|ing)|trash|move (it |this |them )?to (the )?(trash|bin)|discard(s|ing)?|' +
+        'disabl(e|es|ing)|disconnect(s|ing)?|ban|archivieren|in den papierkorb|verwerfen|trennen|sperren',
     ),
+  ],
+  [
+    // Audit A-05: logging out ends the test account's session; the rest of the run needs it.
+    'log-out',
+    word('log ?out|logging out|sign ?out|signing out|abmelden|ausloggen|abmeldung'),
   ],
   [
     'payment',
@@ -177,17 +208,94 @@ const KIND_TEXT: Record<ForbiddenKind, string> = {
   payment: 'it could start a payment',
   outward: 'it could send or publish something to other people',
   'account-change': 'it could change the account’s password or email',
+  'log-out': 'it would log the test account out',
 };
 
+/**
+ * A plain "Send" (audit A-05). It could send a chat message or an email to other people, so it
+ * is refused, except on a contact form, where the visitor writes to the app's owner.
+ */
+const PLAIN_SEND = word(
+  'send|send (a |the |your |this |us a )?(message|note)|senden|absenden|abschicken|verschicken|nachricht senden',
+);
+
+export interface ForbiddenMatch {
+  kind: ForbiddenKind;
+  phrase: string;
+  /** A plain "Send": allowed on a contact form only. */
+  plainSend?: true;
+}
+
 /** Finds forbidden wording in a button text, label or description. */
-export function matchForbidden(text: string): { kind: ForbiddenKind; phrase: string } | null {
+export function matchForbidden(text: string): ForbiddenMatch | null {
   const normal = text.replace(/\s+/g, ' ').trim();
   if (!normal) return null;
   for (const [kind, pattern] of FORBIDDEN) {
     const match = pattern.exec(normal);
     if (match) return { kind, phrase: match[0] };
   }
+  const send = PLAIN_SEND.exec(normal);
+  return send ? { kind: 'outward', phrase: send[0], plainSend: true } : null;
+}
+
+/** "btnDeleteNote", "delete-account", "logout_button" → separate words. */
+const wordsOf = (name: string): string =>
+  name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_.:/#]+/g, ' ');
+
+/** Icon names that mean something forbidden but are not words of their own. */
+const ICON_NAMES: readonly [ForbiddenKind, RegExp][] = [
+  ['destructive', /^(bin|eraser|user-minus|user-x|delete-forever|delete-outline)(-|$)/],
+  ['outward', /^(paper-?plane|send-horizontal)(-|$)/],
+  ['log-out', /^(right-from-bracket|arrow-right-from-bracket|box-arrow-right|exit-to-app)(-|$)/],
+];
+
+function matchIcons(icons: string): ForbiddenMatch | null {
+  for (const icon of icons.toLowerCase().split(/\s+/).filter(Boolean)) {
+    for (const [kind, pattern] of ICON_NAMES) {
+      if (pattern.test(icon)) return { kind, phrase: `${icon} icon` };
+    }
+    const hit = matchForbidden(wordsOf(icon));
+    if (hit) return { ...hit, phrase: `${icon} icon` };
+  }
   return null;
+}
+
+/** In names and ids, "post" usually means a blog post ("post-42"), not posting something. */
+function matchName(name: string): ForbiddenMatch | null {
+  const hit = matchForbidden(wordsOf(name));
+  return hit && !(hit.kind === 'outward' && /^post(ing)?$/i.test(hit.phrase)) ? hit : null;
+}
+
+const RECIPIENT_KEY = /^(to|recipients?|cc|bcc|empf(ä|ae)nger|invitees?|send-?to|share-?with)$/i;
+const RECIPIENT_LABEL =
+  /^(to|an|cc|bcc|recipients?|empfänger|empfaenger|send to|share with|invite)\s*:?$/i;
+const MESSAGE_FIELD =
+  /message|nachricht|comment|kommentar|question|frage|feedback|anliegen|inquiry|enquiry/i;
+const SENDER_FIELD = /e-?mail|\bname\b|full-?name|first-?name|vorname/i;
+
+/**
+ * A contact form: the visitor gives their own name or email address and a message, and there
+ * is no field for whom to send it to (unlike an email composer, an invite or a share form).
+ */
+export function looksLikeContactForm(fields: readonly FormField[]): boolean {
+  if (
+    fields.some(
+      (f) =>
+        f.keys.split(/\s+/).some((key) => RECIPIENT_KEY.test(key)) ||
+        RECIPIENT_LABEL.test(f.label.trim()),
+    )
+  ) {
+    return false;
+  }
+  const message = fields.find(
+    (f) => f.tag === 'textarea' || MESSAGE_FIELD.test(`${f.keys} ${f.label}`),
+  );
+  return (
+    message !== undefined &&
+    fields.some(
+      (f) => f !== message && (f.type === 'email' || SENDER_FIELD.test(`${f.keys} ${f.label}`)),
+    )
+  );
 }
 
 const PAYMENT_FIELD =
@@ -291,22 +399,41 @@ export function judgeAction(action: ProposedAction, facts: ElementFacts | null):
 
   if (TEXT_METHODS.has(method) || SELECT_METHODS.has(method)) return { allowed: true };
 
-  // Clicking, or pressing a key (Enter submits the form the field is in).
-  const texts =
+  // Clicking, or pressing a key (Enter submits the form the field is in). Everything that names
+  // the control counts: its text, accessible name, icons, name, id and test ids (audit A-05).
+  const hits =
     method === 'press'
-      ? [facts.formSubmitText]
+      ? [matchForbidden(facts.formSubmitText)]
       : [
-          facts.text,
-          facts.label,
-          facts.formSubmitText && facts.type === 'submit' ? facts.formSubmitText : '',
-          action.description,
+          matchForbidden(facts.text),
+          matchForbidden(facts.label),
+          matchForbidden(
+            facts.formSubmitText && facts.type === 'submit' ? facts.formSubmitText : '',
+          ),
+          matchForbidden(action.description),
+          matchIcons(facts.icons),
+          matchName(facts.name),
         ];
-  for (const text of texts) {
-    const hit = matchForbidden(text);
-    if (hit) return block(hit.kind, `${KIND_TEXT[hit.kind]} (“${hit.phrase}”)`);
+  const contactForm = looksLikeContactForm(facts.formFields);
+  for (const hit of hits) {
+    if (!hit || (hit.plainSend && contactForm)) continue;
+    return block(hit.kind, `${KIND_TEXT[hit.kind]} (“${hit.phrase}”)`);
   }
   if (facts.href && method !== 'press' && isDestructiveLink(facts.href)) {
     return block('destructive', 'its link address suggests deleting, cancelling or sending');
+  }
+  const nameless =
+    !facts.text.trim() &&
+    !facts.label.trim() &&
+    !facts.name.trim() &&
+    !facts.icons.trim() &&
+    !facts.href &&
+    !facts.toggle;
+  if (method !== 'press' && nameless) {
+    return block(
+      'unverified',
+      'it has no readable name, so ShipCheck cannot tell what it does and did not click it',
+    );
   }
   return { allowed: true };
 }

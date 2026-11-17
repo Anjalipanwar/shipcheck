@@ -29,6 +29,7 @@ npx @anjalipanwar/shipcheck https://myapp.lovable.app
 
 The very first time, ShipCheck may tell you that its test browser is not installed and show the one command that installs it. Run that command, then run ShipCheck again.
 
+
 ## Get a free AI key
 
 ShipCheck uses an AI model to look at your app the way a person would. You need a key for it; Google gives one away for free.
@@ -142,7 +143,7 @@ These rules are built into the code, not just written into instructions for the 
 
 - **It stays on your app.** It does not follow links to other websites.
 - **It never pays.** At a payment page it stops and tells you. Test your payment yourself with a test card.
-- **It does not delete, send, invite or publish.** Buttons like "Delete account" are not clicked.
+- **It does not delete, send, invite or publish, and it does not log out.** Buttons like "Delete account", "Send" or "Log out" are not clicked — also when they show only an icon (a bin, a paper plane). A "Send" button is only used on a contact form, where you are the one who receives the message. A button with no name at all is not clicked either.
 - **It does not attack.** No hacking attempts, only the kind of messy input real people type.
 - **It has a time limit and an AI-call limit**, so a run cannot go on forever or use up your key.
 - **It keeps secrets secret.** Passwords and your AI key are never written to the report or any file.
