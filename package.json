@@ -1,6 +1,6 @@
 {
   "name": "@anjalipanwar/shipcheck",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A QA engineer's pre-launch checkup for your vibe-coded app — in one command.",
   "license": "MIT",
   "author": "Anjali Panwar",

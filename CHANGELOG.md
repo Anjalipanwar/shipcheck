@@ -4,6 +4,24 @@ All notable changes to ShipCheck are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-11-17
+
+Safety and robustness fixes from an independent review before the announcement (`docs/AUDIT-v0.1.0.md`).
+
+### Fixed
+
+- **Stays on your site, also through redirects.** When the server forwarded the browser (after a click, a form or on the home page itself), the redirect was not checked, so the browser could end up on another website. Every redirect step is now checked before it is followed. An app address that forwards to another website stops with a plain message and the address to use instead, rather than a report about a page that is not your app.
+- **Passwords hidden in every spelling.** A password that ended up in a page address (for example from a form sent without a script), inside JSON or HTML-escaped is now hidden too, and so is any password-like value in an address.
+- **An everyday word as test password no longer breaks the run.** With a password such as `test` or `check`, the run used to end with "unexpected problem" and no report. Only free text is hidden now, and longer words that merely contain the password stay readable.
+- **`--max-minutes` is a hard stop.** A very heavy page could keep the run going forever with no report. Now the run stops at the time limit and writes a report with what it checked so far, marked as partial.
+- **A report folder that cannot be written** is found before the app is opened, with a plain message, instead of after the whole run.
+- **The safety guard reads more and refuses more:** "Log out", a plain "Send" (except on a contact form), "Archive", "Move to trash", "Disable", "Disconnect" and their German forms; also buttons that show only an icon (a bin, a paper plane, a log-out arrow), judged by their icon names, inner labels, ids and test ids. A button with no readable name at all is not clicked.
+- **Dependencies:** `npm audit` finds no known vulnerabilities (19 before, 2 of them high), with Stagehand unchanged at 3.7.3.
+
+### Changed
+
+- The README says that npm may print two harmless warnings on the very first `npx` run (issue #1).
+
 ## [0.1.0] — 2026-11-16
 
 First version.
