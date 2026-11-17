@@ -171,6 +171,71 @@ describe('passwords never reach any output', () => {
     },
   );
 
+  // Audit A-02 / A-12: the app itself repeats the password — in the page address (a form sent
+  // as a plain GET, so the password is form-encoded) and in its own message. Only ShipCheck's
+  // final scrubbing stands between that text and the report, in every spelling it can take.
+  it('a password the app repeats in its address and in its message is in no output, in any spelling', async () => {
+    const ECHOED = 'Echo "Pass" & <42>!';
+    const spellings = (value: string): string[] => [
+      value,
+      encodeURIComponent(value),
+      new URLSearchParams({ p: value }).toString().slice(2), // form-encoded: spaces as "+"
+      JSON.stringify(value).slice(1, -1),
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;'),
+    ];
+    const app = await startFixtureServer();
+    const outDir = await mkdtemp(join(tmpdir(), 'shipcheck-pw-'));
+    try {
+      const progress: string[] = [];
+      const result = await runShipCheck(
+        loadConfig(
+          `${app.url}/get-login.html`,
+          {
+            yes: true,
+            flows: 'login',
+            skipMobile: true,
+            email: DEMO_ACCOUNT.email,
+            password: ECHOED,
+          },
+          {},
+        ),
+        { progress: (line) => progress.push(line) },
+        { aiDriver: (budget) => createScriptedDriver({ budget }) },
+      );
+      // The app really did repeat it: the page address after sending carried it, hidden now.
+      expect(JSON.stringify(result.report)).toContain('password=[hidden]');
+
+      const written = await writeReport(outDir, result.report, result.screenshots, result.redact);
+      const files = (await readdir(outDir, { recursive: true })).filter((name) =>
+        /\.(html|md|json)$/.test(name),
+      );
+      const outputs: [string, string][] = [
+        ...(await Promise.all(
+          files.map(
+            async (name) => [name, await readFile(join(outDir, name), 'utf8')] as [string, string],
+          ),
+        )),
+        ['terminal summary', summaryLines(result.report, written.htmlPath, result.llm).join('\n')],
+        ['progress lines', progress.join('\n')],
+        ['step summary', renderStepSummary(result.report)],
+      ];
+      for (const [name, text] of outputs) {
+        for (const spelling of spellings(ECHOED)) {
+          expect(text.includes(spelling), `${name} contains the password as ${spelling}`).toBe(
+            false,
+          );
+        }
+      }
+    } finally {
+      await rm(outDir, { recursive: true, force: true });
+      await app.close();
+    }
+  });
+
   it('a field where ShipCheck typed a password is shown as hidden, however short the password is', async () => {
     const app = await startFixtureServer();
     try {

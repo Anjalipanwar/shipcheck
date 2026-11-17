@@ -97,7 +97,7 @@ export function createScriptedDriver(options: ScriptedOptions = {}): AiDriver & 
             click(byId('signup-button'), 'Create account button'),
           ];
         case PROMPTS.loginEntry:
-          return ['/login.html', '/slow-login.html'].includes(path(page))
+          return ['/login.html', '/slow-login.html', '/get-login.html'].includes(path(page))
             ? []
             : await ifVisible(page, click(navLink('/login.html'), 'Log in link'));
         case PROMPTS.loginForm:

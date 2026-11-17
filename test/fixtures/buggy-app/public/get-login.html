@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Log in (old form) — NoteNest</title>
+    <meta name="description" content="NoteNest test fixture page." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">NoteNest</a>
+    </header>
+    <main>
+      <h1>Log in</h1>
+      <!-- A log-in form without a script: the browser sends it as a plain GET, so the
+           password ends up in the page address. The page then repeats it in its message. -->
+      <form id="login-form" class="card" method="get" action="/get-login.html">
+        <label for="login-email">Email</label>
+        <input id="login-email" name="email" type="email" autocomplete="email" />
+        <label for="login-password">Password</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" />
+        <p id="login-message" class="message" role="alert"></p>
+        <button class="button" type="submit">Log in</button>
+      </form>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      if (params.has('password')) {
+        document.getElementById('login-message').textContent =
+          'No account matches ' + params.get('email') + ' with the password ' + params.get('password') + '.';
+      }
+    </script>
+  </body>
+</html>

@@ -90,3 +90,44 @@ describe('Evidence: action log', () => {
     expect(evidence.actionLog[0]).not.toHaveProperty('value');
   });
 });
+
+describe('Evidence: a protected value in every spelling (audit A-02)', () => {
+  const PASSWORD = 'P@ss w0rd!';
+  const evidence = new Evidence();
+  evidence.protect(PASSWORD);
+
+  it.each([
+    [
+      'in a web address, form-encoded',
+      `https://app.test/login?email=a%40b.c&x=${new URLSearchParams({ v: PASSWORD }).toString().slice(2)}`,
+    ],
+    ['in a web address, encoded', `https://app.test/#${encodeURIComponent(PASSWORD)}`],
+    ['inside JSON', JSON.stringify({ secret: `${PASSWORD} "quoted"` })],
+    ['HTML-escaped', 'value=&quot;P@ss w0rd!&quot;'],
+  ])('%s', (_name, text) => {
+    const out = evidence.redact(text);
+    expect(out).toContain('[hidden]');
+    expect(out).not.toContain('w0rd');
+  });
+
+  it('JSON-escaped and HTML-escaped spellings of a password with quotes are hidden', () => {
+    const quoted = new Evidence();
+    quoted.protect('pa"ss\\word<1>');
+    expect(quoted.redact(JSON.stringify({ p: 'pa"ss\\word<1>' }))).toBe('{"p":"[hidden]"}');
+    expect(quoted.redact('pa&quot;ss\\word&lt;1&gt;')).toBe('[hidden]');
+  });
+
+  it('hides the value of password-like parameters in any web address, whatever was typed', () => {
+    const plain = new Evidence(); // nothing protected
+    expect(plain.redact('https://a.app/login?email=x%40y.z&password=ab&next=/')).toBe(
+      'https://a.app/login?email=x%40y.z&password=[hidden]&next=/',
+    );
+    expect(plain.redact('GET /signup?user_password=Sc-1!9a&pwd=x;pin=1234')).toBe(
+      'GET /signup?user_password=[hidden]&pwd=[hidden];pin=[hidden]',
+    );
+    // Ordinary words and parameters stay as they are.
+    expect(plain.redact('/passage?compass=north&spin=2 password reset')).toBe(
+      '/passage?compass=north&spin=2 password reset',
+    );
+  });
+});

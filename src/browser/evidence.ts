@@ -65,6 +65,30 @@ const MAX_SCREENSHOTS = 60;
 const SCREENSHOT_QUALITY = 55;
 const HIDDEN = '[hidden]';
 
+/** A password-like parameter in a web address, e.g. "?password=…" or "&pwd=…". */
+const PASSWORD_PARAM =
+  /([?&;](?:[\w.-]*[_-])?(?:password|passwd|pass|pwd|passwort|kennwort|pin)(?:[_-][\w.-]*)?=)[^&#;\s"'<>]*/gi;
+
+/** How a value can look once it has passed through addresses, JSON or HTML. */
+export function spellingsOf(value: string): string[] {
+  const html = value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return [
+    ...new Set([
+      value,
+      encodeURIComponent(value),
+      new URLSearchParams({ v: value }).toString().slice(2),
+      encodeURI(value),
+      JSON.stringify(value).slice(1, -1),
+      html,
+    ]),
+  ].filter((spelling) => spelling.length >= 4);
+}
+
 const clip = (text: string): string =>
   text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}… (shortened)` : text;
 
@@ -89,9 +113,14 @@ export class Evidence {
   private scope: string | undefined;
   private watched: string[] = [];
 
-  /** Registers a value (password, API key) that must never appear in logs or reports. */
+  /**
+   * Registers a value (password, API key) that must never appear in logs or reports — in every
+   * spelling it can take on the way: as typed, inside a web address (encoded, or form-encoded
+   * with "+" for spaces), inside JSON, and HTML-escaped (audit A-02).
+   */
   protect(secret: string | undefined): void {
-    if (secret && secret.length >= 4) this.secrets.add(secret);
+    if (!secret || secret.length < 4) return;
+    for (const spelling of spellingsOf(secret)) this.secrets.add(spelling);
   }
 
   /**
@@ -114,10 +143,15 @@ export class Evidence {
     return this.watched.some((value) => decoded.includes(value));
   }
 
-  /** Replaces every protected value in the text. */
+  /**
+   * Replaces every protected value in the text, and the value of every password-like parameter
+   * in a web address (whatever was typed, also passwords too short to be protected as text).
+   */
   redact(text: string): string {
-    let result = text;
-    for (const secret of this.secrets) result = result.split(secret).join(HIDDEN);
+    let result = text.replace(PASSWORD_PARAM, `$1${HIDDEN}`);
+    // Longest first, so a longer spelling is never left half-replaced by a shorter one.
+    const secrets = [...this.secrets].sort((a, b) => b.length - a.length);
+    for (const secret of secrets) result = result.split(secret).join(HIDDEN);
     return result;
   }
 
