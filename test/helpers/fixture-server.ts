@@ -249,6 +249,23 @@ export async function startFixtureServer(options: FixtureOptions = {}): Promise<
     requests.push(`${method} ${path}`);
     userAgents.push(req.headers['user-agent'] ?? '');
 
+    // Test-only: a server-side redirect, e.g. /__redirect?to=<address>&status=303&cookie=hop1.
+    // Stands in for apps whose links, forms or home page forward the visitor elsewhere.
+    if (path === '/__redirect') {
+      const query = new URL(req.url ?? '/', 'http://localhost').searchParams;
+      const status = Number(query.get('status') ?? 302);
+      const cookie = query.get('cookie');
+      req.resume(); // a POST body is read and ignored
+      req.on('end', () => {
+        res.writeHead(status, {
+          location: query.get('to') ?? '/',
+          ...(cookie ? { 'set-cookie': `${cookie}=1; Path=/` } : {}),
+        });
+        res.end();
+      });
+      return;
+    }
+
     const work =
       (path.startsWith('/api/') || path === '/__t/trackevents') && method === 'POST'
         ? handleApi(path, req, res)

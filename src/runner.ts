@@ -25,7 +25,7 @@ import { checkPerformance } from './checks/performance.js';
 import { checkSecrets, type SecretSource } from './checks/secrets.js';
 import { checkSeo } from './checks/seo.js';
 import type { CheckResult } from './checks/types.js';
-import type { Config } from './config.js';
+import { ConfigError, type Config } from './config.js';
 import { judge } from './ai/judge.js';
 import {
   CoverageRecorder,
@@ -249,7 +249,7 @@ export async function runShipCheck(
     const userAgent = session.userAgentFor(DESKTOP);
     const fetchOptions = { lock: session.lock, userAgent };
 
-    const landing = await openLanding(desktop, config.url, evidence, collector, progress);
+    const landing = await openLanding(desktop, config.url, evidence, collector, progress, session);
     landingLoaded = landing !== undefined;
     if (landing) {
       const { facts, headers, finalUrl } = landing;
@@ -616,8 +616,10 @@ async function openLanding(
   evidence: Evidence,
   collector: Collector,
   progress: (line: string) => void,
+  session: BrowserSession,
 ): Promise<Landing | undefined> {
   evidence.setScope('landing');
+  const blockedBefore = evidence.count('blocked-navigation');
   let status: number | null = null;
   let failure = '';
   let headers: Record<string, string> = {};
@@ -627,6 +629,22 @@ async function openLanding(
     headers = response ? await response.allHeaders() : {};
   } catch (error) {
     failure = error instanceof Error ? (error.message.split('\n')[0] ?? '') : 'unknown error';
+  }
+  // Audit A-01: an address that forwards to another website is not the app's home page. The
+  // domain lock stopped the browser before it got there; say so instead of testing anything.
+  const forwardedTo =
+    evidence.events
+      .filter((e) => e.kind === 'blocked-navigation')
+      .slice(blockedBefore)
+      .map((e) => (e.kind === 'blocked-navigation' ? e.url : ''))[0] ??
+    (status !== null &&
+    /^https?:/.test(desktop.page.url()) &&
+    !session.lock.isAllowed(desktop.page.url())
+      ? desktop.page.url()
+      : undefined);
+  if (forwardedTo) {
+    evidence.setScope(undefined);
+    throw new ConfigError(offSiteMessage(url, forwardedTo));
   }
   const loaded = status !== null && status < 400;
   evidence.logAction({
@@ -680,6 +698,16 @@ async function openLanding(
 }
 
 const facts = (landing: Landing): PageFacts => landing.facts;
+
+/** The message for an address that forwards to another website (shown instead of a report). */
+export function offSiteMessage(url: string, forwardedTo: string): string {
+  return [
+    `${url} forwards visitors to another website: ${forwardedTo}`,
+    'ShipCheck only tests the website you name, so it stopped before opening that one. Nothing was tested.',
+    'If that address is your app, run ShipCheck on it instead:',
+    `  npx @anjalipanwar/shipcheck ${forwardedTo}`,
+  ].join('\n');
+}
 
 /**
  * Phone layout checks: the home page and up to five pages linked from it (menu and main buttons

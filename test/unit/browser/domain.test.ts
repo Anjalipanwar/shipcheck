@@ -3,6 +3,7 @@ import {
   createDomainLock,
   decideRoute,
   isLocalAddress,
+  isPrivateNetworkTarget,
   siteKey,
 } from '../../../src/browser/domain.js';
 
@@ -111,5 +112,35 @@ describe('decideRoute', () => {
     expect(decideRoute({ url: offSite, isNavigation: true, isTopFrame: false }, lock)).toBe(
       'allow',
     );
+  });
+});
+
+describe('isPrivateNetworkTarget', () => {
+  it('is true for this computer and private networks', () => {
+    for (const url of [
+      'http://localhost:3000',
+      'http://127.0.0.1:4173',
+      'http://[::1]:8080',
+      'http://app.localhost',
+      'http://10.0.0.5',
+      'http://172.20.1.1',
+      'http://192.168.1.20:5173',
+      'http://169.254.10.1',
+      'http://[fd12::1]',
+      'http://printer.local',
+    ]) {
+      expect(isPrivateNetworkTarget(url), url).toBe(true);
+    }
+  });
+  it('is false for public sites and addresses', () => {
+    for (const url of [
+      'https://myapp.lovable.app',
+      'https://8.8.8.8',
+      'http://172.32.0.1',
+      'http://[2001:db8::1]',
+      'not a url',
+    ]) {
+      expect(isPrivateNetworkTarget(url), url).toBe(false);
+    }
   });
 });

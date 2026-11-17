@@ -122,6 +122,23 @@ describe('the shipcheck command', () => {
     expect(output).toContain('[blocker] Your app’s home page does not load');
   });
 
+  it('an address that forwards to another website: never "Home page opens"; plain message with the address to use, exit code 2, no report, the other site never contacted (audit A-01)', async () => {
+    const outside = await startFixtureServer();
+    try {
+      const forwarding = `${app.url}/__redirect?to=${encodeURIComponent(`${outside.url}/landed-home`)}`;
+      const { code, output } = await cli([forwarding, ...quick, '--yes']);
+      expect(code).toBe(2);
+      expect(output).not.toContain('Opening your app… ✓');
+      expect(output).toContain('forwards visitors to another website');
+      expect(output).toContain(`${outside.url}/landed-home`);
+      expect(output).not.toMatch(NO_STACK_TRACE);
+      expect(existsSync(join(dir, 'shipcheck-report'))).toBe(false);
+      expect(outside.requests.filter((r) => r.includes('/landed-home'))).toEqual([]);
+    } finally {
+      await outside.close();
+    }
+  });
+
   describe('exit code 2: ShipCheck itself could not run — nothing is opened, no stack trace', () => {
     const nothingStarted = (output: string) => {
       expect(output).not.toContain('ShipCheck is checking');

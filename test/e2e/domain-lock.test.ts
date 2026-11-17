@@ -127,3 +127,84 @@ describe('domain lock in a real browser', () => {
     await phone.context.close();
   });
 });
+
+/**
+ * Audit A-01: the browser follows a server's redirect answer (301/302/303/307) without asking
+ * Playwright's request routing, so the domain lock above never saw where it led. Every hop of a
+ * redirect must be checked before the browser goes there.
+ */
+describe('domain lock and server redirects', () => {
+  const via = (to: string, extra = '') =>
+    `${app.url}/__redirect?to=${encodeURIComponent(to)}${extra}`;
+  const outsidePages = () => outside.requests.filter((r) => r.startsWith('GET /landed-'));
+
+  it('a typed address that forwards to another site is blocked before the other site is contacted', async () => {
+    await desktop.page.goto(`${app.url}/contact.html`);
+    await expect(desktop.page.goto(via(`${outside.url}/landed-typed`))).rejects.toThrow();
+    await settle();
+    expect(desktop.page.url()).toBe(`${app.url}/contact.html`);
+    expect(blocked()).toContain(`${outside.url}/landed-typed`);
+  });
+
+  it('a clicked link whose answer forwards to another site is blocked', async () => {
+    await desktop.page.goto(`${app.url}/contact.html`);
+    await desktop.page.evaluate(`(() => {
+      const a = document.createElement('a');
+      a.id = 'forwarding-link'; a.href = '${via(`${outside.url}/landed-clicked`)}'; a.textContent = 'go';
+      document.querySelector('main').prepend(a);
+    })()`);
+    await desktop.page.click('#forwarding-link');
+    await settle();
+    expect(desktop.page.url()).toBe(`${app.url}/contact.html`);
+    expect(blocked()).toContain(`${outside.url}/landed-clicked`);
+  });
+
+  it('a form sent with POST and answered with 303 to another site is blocked', async () => {
+    await desktop.page.goto(`${app.url}/contact.html`);
+    await desktop.page.evaluate(`(() => {
+      const f = document.createElement('form');
+      f.method = 'post'; f.action = '${via(`${outside.url}/landed-post`, '&status=303')}';
+      f.id = 'forwarding-form';
+      document.querySelector('main').prepend(f);
+      f.submit();
+    })()`);
+    await settle();
+    expect(desktop.page.url()).toBe(`${app.url}/contact.html`);
+    expect(blocked()).toContain(`${outside.url}/landed-post`);
+  });
+
+  it('a chain that leaves the site only at its second hop is blocked too', async () => {
+    await desktop.page.goto(`${app.url}/contact.html`);
+    const chain = via(via(`${outside.url}/landed-chain`));
+    await expect(desktop.page.goto(chain)).rejects.toThrow();
+    await settle();
+    expect(desktop.page.url()).toBe(`${app.url}/contact.html`);
+    expect(blocked()).toContain(`${outside.url}/landed-chain`);
+  });
+
+  it('redirects within the site still work, keep the cookies set on the way, and send a POST once', async () => {
+    await desktop.page.goto(`${app.url}/contact.html`);
+    const response = await desktop.page.goto(
+      via(via(`${app.url}/features.html`, '&cookie=hopTwo'), '&cookie=hopOne'),
+    );
+    expect(response?.status()).toBe(200);
+    expect(desktop.page.url()).toBe(`${app.url}/features.html`);
+    const names = (await desktop.context.cookies()).map((c) => c.name);
+    expect(names).toEqual(expect.arrayContaining(['hopOne', 'hopTwo']));
+
+    await desktop.page.goto(`${app.url}/contact.html`);
+    const before = app.requests.length;
+    await desktop.page.evaluate(`(() => {
+      const f = document.createElement('form');
+      f.method = 'post'; f.action = '${via(`${app.url}/features.html`, '&status=303')}';
+      document.body.prepend(f);
+      f.submit();
+    })()`);
+    await desktop.page.waitForURL('**/features.html');
+    expect(app.requests.slice(before).filter((r) => r === 'POST /__redirect')).toHaveLength(1);
+  });
+
+  it('the other site never received any of these page requests', () => {
+    expect(outsidePages()).toEqual([]);
+  });
+});

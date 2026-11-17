@@ -21,6 +21,32 @@ export function isLocalAddress(hostname: string): boolean {
   );
 }
 
+/**
+ * True for apps on this computer or on a private network (10.x, 172.16–31.x, 192.168.x,
+ * 169.254.x, fc00::/7, fe80::/10, *.local). Such apps may call other local servers.
+ */
+export function isPrivateNetworkTarget(targetUrl: string): boolean {
+  let host: string;
+  try {
+    host = bareHost(new URL(targetUrl).hostname);
+  } catch {
+    return false;
+  }
+  if (isLocalAddress(host) || host.endsWith('.local')) return true;
+  if (isIP(host) === 4) {
+    const [a = 0, b = 0] = host.split('.').map(Number);
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254)
+    );
+  }
+  if (isIP(host) === 6) return /^(fc|fd|fe[89ab])/i.test(host);
+  return false;
+}
+
 function effectivePort(url: URL): string {
   if (url.port) return url.port;
   return url.protocol === 'https:' ? '443' : '80';
