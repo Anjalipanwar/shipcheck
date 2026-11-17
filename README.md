@@ -29,6 +29,7 @@ npx @anjalipanwar/shipcheck https://myapp.lovable.app
 
 The very first time, ShipCheck may tell you that its test browser is not installed and show the one command that installs it. Run that command, then run ShipCheck again.
 
+Also the very first time, npm itself may print two warnings before ShipCheck starts (`npm warn ERESOLVE overriding peer dependency` and `npm warn deprecated node-domexception`). They come from packages that ShipCheck's browser-automation library uses, and they are harmless: you can ignore them.
 
 ## Get a free AI key
 
