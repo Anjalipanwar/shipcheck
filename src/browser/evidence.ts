@@ -69,6 +69,8 @@ const HIDDEN = '[hidden]';
 const PASSWORD_PARAM =
   /([?&;](?:[\w.-]*[_-])?(?:password|passwd|pass|pwd|passwort|kennwort|pin)(?:[_-][\w.-]*)?=)[^&#;\s"'<>]*/gi;
 
+const LETTERS_ONLY = /^\p{L}+$/u;
+
 /** How a value can look once it has passed through addresses, JSON or HTML. */
 export function spellingsOf(value: string): string[] {
   const html = value
@@ -151,7 +153,13 @@ export class Evidence {
     let result = text.replace(PASSWORD_PARAM, `$1${HIDDEN}`);
     // Longest first, so a longer spelling is never left half-replaced by a shorter one.
     const secrets = [...this.secrets].sort((a, b) => b.length - a.length);
-    for (const secret of secrets) result = result.split(secret).join(HIDDEN);
+    for (const secret of secrets) {
+      // A password made of letters only ("test", "Login") is hidden where it stands as a word
+      // of its own, not inside longer words ("tested", "Logins"), which stay readable (A-03).
+      result = LETTERS_ONLY.test(secret)
+        ? result.replace(new RegExp(`(?<![\\p{L}\\p{N}])${secret}(?![\\p{L}\\p{N}])`, 'gu'), HIDDEN)
+        : result.split(secret).join(HIDDEN);
+    }
     return result;
   }
 

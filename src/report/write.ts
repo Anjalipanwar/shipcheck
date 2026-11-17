@@ -12,13 +12,44 @@ export interface WrittenReport {
   markdownPath: string;
 }
 
-/** Applies `redact` to every piece of text inside a value, however deeply nested. */
+/**
+ * Fields that hold fixed values (verdict, states, severities, rule names, ids, file names of
+ * screenshots, times…), never text from the run. They are never scrubbed: a password that is an
+ * everyday word ("test", "mobile", "check") would otherwise break them (audit A-03).
+ */
+const FIXED_VALUE_KEYS = new Set([
+  'id',
+  'rule',
+  'severity',
+  'category',
+  'flow',
+  'device',
+  'confidence',
+  'area',
+  'state',
+  'worst',
+  'verdict',
+  'mode',
+  'model',
+  'shipcheckVersion',
+  'startedAt',
+  'at',
+  'step',
+  'action',
+  'result',
+  'screenshots',
+]);
+
+/** Applies `redact` to every piece of free text inside a value, however deeply nested. */
 export function redactDeep<T>(value: T, redact: (text: string) => string): T {
   if (typeof value === 'string') return redact(value) as T;
   if (Array.isArray(value)) return value.map((item) => redactDeep(item, redact)) as T;
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, redactDeep(item, redact)]),
+      Object.entries(value).map(([key, item]) => [
+        key,
+        FIXED_VALUE_KEYS.has(key) ? item : redactDeep(item, redact),
+      ]),
     ) as T;
   }
   return value;

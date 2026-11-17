@@ -122,6 +122,29 @@ describe('the shipcheck command', () => {
     expect(output).toContain('[blocker] Your app’s home page does not load');
   });
 
+  it.each(['test', 'mobile', 'check', 'desktop', 'verified'])(
+    'a test password that is an everyday word (“%s”) still gives a full report, and never crashes the run (audit A-03)',
+    async (password) => {
+      const { code, output } = await cli([
+        app.url,
+        ...quick,
+        '--yes',
+        '--email',
+        'someone@example.com',
+        '--password',
+        password,
+      ]);
+      expect(code).toBe(1); // the fixture app has blockers: a finished check, not a crash
+      expect(output).not.toContain('unexpected problem');
+      const json = JSON.parse(
+        readFileSync(join(dir, 'shipcheck-report', 'report.json'), 'utf8'),
+      ) as { verdict: string; coverage: { state: string }[] };
+      expect(json.verdict).toBe('checks-found-issues');
+      expect(json.coverage.map((c) => c.state)).not.toContain(expect.stringContaining('[hidden]'));
+      expect(existsSync(join(dir, 'shipcheck-report', 'report.html'))).toBe(true);
+    },
+  );
+
   it('an address that forwards to another website: never "Home page opens"; plain message with the address to use, exit code 2, no report, the other site never contacted (audit A-01)', async () => {
     const outside = await startFixtureServer();
     try {
