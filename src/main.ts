@@ -6,6 +6,7 @@ import { ConfigError, loadConfig, readConfigFile } from './config.js';
 import { confirmOwnership } from './confirm.js';
 import { exitCodeFor } from './exit-code.js';
 import { openReport } from './open-report.js';
+import { checkOutputFolder } from './output-dir.js';
 import { buildProgram, EXIT } from './program.js';
 import { writeReport } from './report/write.js';
 import { runShipCheck } from './runner.js';
@@ -18,6 +19,8 @@ async function run(urlArg: string, flags: Record<string, unknown>): Promise<numb
   const config = loadConfig(urlArg, flags, process.env, readConfigFile(process.cwd()));
   // Without a key this stops here with a how-to (exit code 2), before anything is opened.
   const model = config.noAi ? undefined : chooseModel(process.env, config.model);
+  const outDir = resolve(config.out);
+  await checkOutputFolder(outDir, config.out);
   await confirmOwnership(config, { env: process.env, interactive: process.stdin.isTTY === true });
 
   print(`\nShipCheck is checking ${config.url}\n`);
@@ -27,10 +30,18 @@ async function run(urlArg: string, flags: Record<string, unknown>): Promise<numb
     { progress: (line) => print(`  ${line}`) },
     model ? { model } : {},
   );
-  const outDir = resolve(config.out);
-  const written = await writeReport(outDir, result.report, result.screenshots, result.redact);
-
   const { report } = result;
+  let written: Awaited<ReturnType<typeof writeReport>>;
+  try {
+    written = await writeReport(outDir, report, result.screenshots, result.redact);
+  } catch (error) {
+    // The folder was writable at the start; if that changed, the result is still shown.
+    for (const line of summaryLines(report, '(not written)', result.llm)) print(line);
+    throw new ConfigError(
+      `The check finished, but the report could not be saved in “${config.out}”` +
+        ` (${(error as { code?: string }).code ?? 'unknown reason'}). The summary above is the result.`,
+    );
+  }
   for (const line of summaryLines(report, written.htmlPath, result.llm)) print(line);
   await writeStepSummary(report, process.env);
   await openReport(written.htmlPath, {

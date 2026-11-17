@@ -1,5 +1,13 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -199,6 +207,37 @@ describe('the shipcheck command', () => {
       expect(code).toBe(2);
       expect(output).toContain(message);
       nothingStarted(output);
+    });
+
+    it.each([
+      ['inside a folder that cannot be written to', 'locked/report', 'cannot be written to'],
+      ['an existing file, not a folder', 'a-file.txt', 'cannot be written to'],
+    ])(
+      '--out %s: a plain message before the app is opened (audit A-06)',
+      async (_name, out, message) => {
+        mkdirSync(join(dir, 'locked'));
+        chmodSync(join(dir, 'locked'), 0o500);
+        writeFileSync(join(dir, 'a-file.txt'), 'keep me');
+        const before = app.requests.length;
+        try {
+          const { code, output } = await cli([app.url, ...quick, '--yes', '--out', out]);
+          expect(code).toBe(2);
+          expect(output).toContain(message);
+          expect(output).toContain(out);
+          expect(output).not.toContain('unexpected problem');
+          expect(app.requests.slice(before)).toEqual([]); // the app was never opened
+          nothingStarted(output);
+          expect(readFileSync(join(dir, 'a-file.txt'), 'utf8')).toBe('keep me');
+        } finally {
+          chmodSync(join(dir, 'locked'), 0o700);
+        }
+      },
+    );
+
+    it('a check that is cancelled at the ownership question leaves no empty report folder (audit A-06)', async () => {
+      const { code } = await cli([app.url, ...quick, '--out', 'deep/new/folder']);
+      expect(code).toBe(2);
+      expect(existsSync(join(dir, 'deep'))).toBe(false);
     });
 
     it('no AI key: a how-to in plain words, before anything is opened', async () => {
