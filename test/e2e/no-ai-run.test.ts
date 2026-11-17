@@ -128,6 +128,11 @@ describe('planted bugs found without AI', () => {
 });
 
 describe('expected extras and nothing else', () => {
+  it('a run that finished in time records no “stopped by”', () => {
+    expect(report.meta.stoppedBy).toBeUndefined();
+    expect(JSON.parse(reportText).meta).not.toHaveProperty('stoppedBy');
+  });
+
   it('local address → Info "Local address — HTTPS not checked"', () => {
     const info = only('https/local-address');
     expect(info).toMatchObject({ severity: 'info', title: 'Local address — HTTPS not checked' });
@@ -453,6 +458,7 @@ describe('coverage when the time runs out', () => {
     // Running out of time is not the app's fault.
     expect(result.report.findings.map((f) => f.rule)).not.toContain('landing/not-loading');
     expect(result.report.meta.partial).toBe(true);
+    expect(result.report.meta.stoppedBy).toBe('time-limit');
     expect(result.report.notTested).toContain(
       'Everything — the time limit of 0.001 minutes was reached, so ShipCheck stopped and wrote this report with what it had checked so far',
     );

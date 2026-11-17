@@ -134,6 +134,11 @@ export const ReportSchema = z
       mode: z.enum(['full', 'no-ai']),
       /** True when a budget ran out or the run stopped early. */
       partial: z.boolean(),
+      /**
+       * Set only when the run was stopped from outside its own steps: by the time limit
+       * (--max-minutes). Then the exit code is 3 unless problems at the --fail-on level were found.
+       */
+      stoppedBy: z.enum(['time-limit']).optional(),
       llmCalls: z.number().int().nonnegative(),
       /** AI calls per flow, and the limit for the run (absent in --no-ai runs). */
       llmCallsByFlow: z.record(z.string(), z.number().int().nonnegative()).optional(),

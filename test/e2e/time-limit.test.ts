@@ -72,17 +72,18 @@ describe('the time limit (audit A-04)', () => {
       expect(seconds, `the run took ${Math.round(seconds)} s:\n${output}`).toBeLessThan(
         LIMIT_S + GRACE_S,
       );
-      expect(code).not.toBe(2);
+      expect(code).toBe(3); // stopped by the time limit, nothing at the --fail-on level
       expect(output).toMatch(/time limit/i);
       expect(output).not.toContain('unexpected problem');
       const reportFile = join(dir, 'shipcheck-report', 'report.json');
       expect(existsSync(reportFile)).toBe(true);
       const report = JSON.parse(readFileSync(reportFile, 'utf8')) as {
-        meta: { partial: boolean };
+        meta: { partial: boolean; stoppedBy?: string };
         notTested: string[];
         findings: { rule: string }[];
       };
       expect(report.meta.partial).toBe(true);
+      expect(report.meta.stoppedBy).toBe('time-limit');
       expect(report.notTested.join('\n')).toMatch(/time limit of 1 minute/);
       // Running out of time is not the app's fault: no "home page does not load".
       expect(report.findings.map((f) => f.rule)).not.toContain('landing/not-loading');

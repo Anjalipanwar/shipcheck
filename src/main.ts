@@ -48,7 +48,7 @@ async function run(urlArg: string, flags: Record<string, unknown>): Promise<numb
     env: process.env,
     interactive: process.stdout.isTTY === true,
   });
-  return exitCodeFor(report.counts, config.failOn);
+  return exitCodeFor(report.counts, config.failOn, report.meta.stoppedBy);
 }
 
 // A ".env" file in the current folder may hold the AI key (never committed, see .env.example).

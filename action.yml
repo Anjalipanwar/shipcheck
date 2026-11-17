@@ -71,7 +71,7 @@ outputs:
     description: 'The verdict of the report (for example "ready" or "not-ready"); empty if ShipCheck could not run'
     value: ${{ steps.run.outputs.verdict }}
   exit-code:
-    description: '0 = passed the fail-on level, 1 = problems at or above it, 2 = ShipCheck itself could not run'
+    description: '0 = passed the fail-on level, 1 = problems at or above it, 2 = ShipCheck itself could not run, 3 = stopped by the time limit with nothing at the fail-on level found (results incomplete)'
     value: ${{ steps.run.outputs.exit-code }}
   report-dir:
     description: 'Folder the report was written to'
@@ -162,6 +162,8 @@ runs:
       run: |
         if [ "$EXIT_CODE" = "1" ]; then
           echo "ShipCheck found problems at or above the fail-on level. Open the run summary, or report.html in the uploaded artifact."
+        elif [ "$EXIT_CODE" = "3" ]; then
+          echo "ShipCheck was stopped by the time limit, results incomplete. The report shows what was checked; run again with a higher max-minutes."
         elif [ "$EXIT_CODE" != "0" ]; then
           echo "ShipCheck could not run (exit code $EXIT_CODE). The messages of the step before this one say why."
         fi

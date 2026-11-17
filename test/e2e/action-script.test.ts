@@ -137,6 +137,27 @@ describe('the action’s “Run ShipCheck” script', () => {
     expect(existsSync(join(dir, 'shipcheck-report'))).toBe(false);
   });
 
+  it('exit code 3 (stopped by the time limit): its own message, and the job fails with 3', async () => {
+    const last = spawn('bash', ['-e', '-o', 'pipefail', '-c', resultScript], {
+      env: { PATH: process.env.PATH ?? '', EXIT_CODE: '3' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    last.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()));
+    last.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()));
+    const code = await new Promise<number | null>((resolve) => last.on('exit', resolve));
+    expect(code).toBe(3);
+    expect(output).toContain('stopped by the time limit, results incomplete');
+    expect(output).not.toContain('could not run');
+  });
+
+  it('the exit-code output describes all four codes', () => {
+    const description = /exit-code:\n\s+description: '([^']*)'/.exec(
+      readRepoFile('action.yml'),
+    )?.[1];
+    expect(description).toMatch(/0 = .*1 = .*2 = .*3 = stopped by the time limit/);
+  });
+
   it('input values are data, never commands: quotes, $( ) and ; in an input run nothing', async () => {
     const { code, output } = await runAction({
       INPUT_URL: app.url,

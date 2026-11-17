@@ -121,7 +121,7 @@ Use an account made for testing, never your own. ShipCheck never writes a passwo
 
 The password and "yes" are not accepted in this file, on purpose: a file like this is easily shared or committed. An option typed on the command line wins over the file.
 
-**Exit codes** (for scripts): `0` = no problems at the `--fail-on` level, `1` = problems found, `2` = ShipCheck itself could not run (wrong address, no AI key, …).
+**Exit codes** (for scripts): `0` = no problems at the `--fail-on` level, `1` = problems found, `2` = ShipCheck itself could not run (wrong address, no AI key, …), `3` = stopped by the time limit (`--max-minutes`) before it found problems at the `--fail-on` level — the results are incomplete; the report shows what was checked. Problems found win over the time limit (`1`), and `--fail-on none` always gives `0`.
 
 ## Use it on GitHub
 

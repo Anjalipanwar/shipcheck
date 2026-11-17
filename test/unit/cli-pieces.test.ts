@@ -19,6 +19,24 @@ describe('exit code (SPEC §5.1)', () => {
   ] as const)('%i Blocker, %i Major, --fail-on %s → %i', (blocker, major, failOn, expected) => {
     expect(exitCodeFor({ blocker, major }, failOn)).toBe(expected);
   });
+
+  // Owner's decision 2026-11-17: a run stopped by the time limit has its own code, 3 — unless
+  // problems at the --fail-on level were found (1), or --fail-on none (always 0).
+  it.each([
+    // blocker, major, --fail-on, expected
+    [0, 0, 'blocker', 3],
+    [0, 3, 'blocker', 3], // Majors below the level do not count
+    [1, 0, 'blocker', 1],
+    [0, 0, 'major', 3],
+    [0, 1, 'major', 1],
+    [0, 0, 'none', 0],
+    [2, 5, 'none', 0],
+  ] as const)(
+    'stopped by the time limit: %i Blocker, %i Major, --fail-on %s → %i',
+    (blocker, major, failOn, expected) => {
+      expect(exitCodeFor({ blocker, major }, failOn, 'time-limit')).toBe(expected);
+    },
+  );
 });
 
 describe('opening the report when the run is done', () => {

@@ -3,7 +3,12 @@ import { FAIL_ON_LEVELS, FLOW_NAMES } from './config.js';
 import { VERSION } from './version.js';
 
 /** Exit codes from SPEC §5.1. */
-export const EXIT = { passed: 0, issuesFound: 1, shipcheckFailed: 2 } as const;
+export const EXIT = {
+  passed: 0,
+  issuesFound: 1,
+  shipcheckFailed: 2,
+  stoppedByTimeLimit: 3,
+} as const;
 
 export type RunHandler = (url: string, flags: Record<string, unknown>) => Promise<void>;
 

@@ -669,6 +669,7 @@ export async function runShipCheck(
       shipcheckVersion: VERSION,
       mode,
       partial: kept.collector.partial,
+      ...(stopped ? { stoppedBy: 'time-limit' as const } : {}),
       llmCalls: llm?.total ?? 0,
       ...(llm ? { llmCallsByFlow: llm.byFlow, llmCallLimit: llm.max } : {}),
     },

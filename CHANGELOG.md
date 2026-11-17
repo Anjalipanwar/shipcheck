@@ -20,6 +20,7 @@ Safety and robustness fixes from an independent review before the announcement (
 
 ### Changed
 
+- **Behaviour change — new exit code `3`:** a run stopped by the time limit (`--max-minutes`) before it found problems at the `--fail-on` level now exits with `3` ("results incomplete") instead of `0`, so a CI job no longer goes green on a run that checked little. Problems found still give `1`, also when time ran out, and `--fail-on none` still always gives `0`. `report.json` records the stop as `meta.stoppedBy: "time-limit"`. The GitHub Action names this case in its last step and in its `exit-code` output.
 - The README says that npm may print a few harmless warnings on the very first `npx` run (issue #1).
 
 ## [0.1.0] — 2026-11-16
