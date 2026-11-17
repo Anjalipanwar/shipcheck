@@ -16,11 +16,11 @@ Safety and robustness fixes from an independent review before the announcement (
 - **`--max-minutes` is a hard stop.** A very heavy page could keep the run going forever with no report. Now the run stops at the time limit and writes a report with what it checked so far, marked as partial.
 - **A report folder that cannot be written** is found before the app is opened, with a plain message, instead of after the whole run.
 - **The safety guard reads more and refuses more:** "Log out", a plain "Send" (except on a contact form), "Archive", "Move to trash", "Disable", "Disconnect" and their German forms; also buttons that show only an icon (a bin, a paper plane, a log-out arrow), judged by their icon names, inner labels, ids and test ids. A button with no readable name at all is not clicked.
-- **Dependencies:** `npm audit` finds no known vulnerabilities (19 before, 2 of them high), with Stagehand unchanged at 3.7.3.
+- **Dependencies:** the versions in this repository's lock file have no known vulnerabilities (19 before, 2 of them high), with Stagehand unchanged at 3.7.3. The GitHub Action installs exactly these. An install with `npx` or `npm install` still gets the newest versions Stagehand allows, which include the two high advisories; the affected code only parses multipart form answers, which the AI library ShipCheck uses never asks it to do; fixing that needs a Stagehand change and is planned for v0.2.
 
 ### Changed
 
-- The README says that npm may print two harmless warnings on the very first `npx` run (issue #1).
+- The README says that npm may print a few harmless warnings on the very first `npx` run (issue #1).
 
 ## [0.1.0] — 2026-11-16
 

@@ -3,24 +3,25 @@
 Updated at the end of every milestone. Read this at the start of every session.
 
 - **Plan:** `docs/BUILD_PLAN.md` · **Spec and full decisions log:** `docs/SPEC.md` §13
-- **Last updated:** 2026-11-16, M10 done: 0.1.0 is on npm, tags `v0.1.0` and `v0` are set, the project page is live
-- **Next up:** nothing is in progress. Planned: see "Next release (0.1.1)" below. Open with the owner: the GitHub release for `v0.1.0`, the timed quickstart, the "About" box, the demo GIF; later release: a real-app sample report.
+- **Last updated:** 2026-11-17, 0.1.1 prepared (audit fixes), not pushed, not published
+- **Next up:** the owner's answers in "0.1.1 — Audit fixes" → "Open, with the owner" (push, one real-key run, publish). Still open from M10: the GitHub release for `v0.1.0`, the timed quickstart, the "About" box, the demo GIF; later release: a real-app sample report.
 
 ## Overview
 
-| Milestone                                            | Status | Commit                           | Pushed                                                      |
-| ---------------------------------------------------- | ------ | -------------------------------- | ----------------------------------------------------------- |
-| M0 — Scaffold                                        | done   | `b59adfc`                        | yes                                                         |
-| M1 — Fixture app with planted bugs                   | done   | `2d605ba`                        | yes                                                         |
-| M2 — Browser session, evidence, deterministic checks | done   | `6498102`                        | yes                                                         |
-| M3 — Report renderer and verdict                     | done   | `8e0b406`                        | yes                                                         |
-| M4 — AI flows with Stagehand + safety guard          | done   | `f5f7e63`                        | yes                                                         |
-| M5 — Mobile pass                                     | done   | `f168b9e`                        | yes                                                         |
-| M6 — AI judge, fix prompts, dedupe                   | done   | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
-| M7 — CLI polish                                      | done   | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
-| M8 — GitHub Action                                   | done   | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
-| M9 — Docs and launch assets                          | done   | see M9 section                   | see M9 section                                              |
-| M10 — Release                                        | done   | `38c5fec`                        | yes, with tags `v0.1.0`, `v0`                               |
+| Milestone                                            | Status                  | Commit                           | Pushed                                                      |
+| ---------------------------------------------------- | ----------------------- | -------------------------------- | ----------------------------------------------------------- |
+| M0 — Scaffold                                        | done                    | `b59adfc`                        | yes                                                         |
+| M1 — Fixture app with planted bugs                   | done                    | `2d605ba`                        | yes                                                         |
+| M2 — Browser session, evidence, deterministic checks | done                    | `6498102`                        | yes                                                         |
+| M3 — Report renderer and verdict                     | done                    | `8e0b406`                        | yes                                                         |
+| M4 — AI flows with Stagehand + safety guard          | done                    | `f5f7e63`                        | yes                                                         |
+| M5 — Mobile pass                                     | done                    | `f168b9e`                        | yes                                                         |
+| M6 — AI judge, fix prompts, dedupe                   | done                    | `c2c651a` … `6403dbc`            | up to `fc928dc` yes; later commits no                       |
+| M7 — CLI polish                                      | done                    | `951404c`, `bcec284` + follow-up | `bcec284` yes (CI green, about 5 min per job); follow-up no |
+| M8 — GitHub Action                                   | done                    | `8727d73`, `e28acdf` + follow-up | `e28acdf` yes (CI and self-test green); follow-up no        |
+| M9 — Docs and launch assets                          | done                    | see M9 section                   | see M9 section                                              |
+| M10 — Release                                        | done                    | `38c5fec`                        | yes, with tags `v0.1.0`, `v0`                               |
+| 0.1.1 — Audit fixes                                  | prepared, not published | `a13978d` … release commit       | no (to be asked)                                            |
 
 ## Standing instructions from the owner
 
@@ -511,12 +512,54 @@ The owner's own app (address and report kept outside this public repo, as agreed
 
 ---
 
-## Next release (0.1.1)
+## 0.1.1 — Audit fixes (2026-11-17)
 
-Not started. Nothing here is decided beyond what the issue says.
+- **Status:** prepared, stopped before `npm publish` (owner's instruction). Version 0.1.1, CHANGELOG written, package packed and checked from an empty folder.
+- **Commits (all on `main`, none pushed):** `a13978d` A-01 redirects · `545a021` A-02/A-12 passwords in every spelling · `dfe666c` A-03 everyday-word passwords · `0ec24db` A-06 report folder · `72789e9` A-05 guard · `04d2977` A-16 README note · `5e92419` A-04 hard time limit · `17b6e7e` A-08 npm audit fix · `247af36` release: version, CHANGELOG, audit with status · then the commit that records this section.
+- **Pushed:** no — to be asked. CI can only go green after a push.
 
-1. **Issue #1 — "Hide npm's ERESOLVE and deprecation warnings on first npx run"** (https://github.com/Anjalipanwar/shipcheck/issues/1, opened 2026-11-16 at the owner's request). On the first `npx @anjalipanwar/shipcheck …` run with an empty npm cache, npm prints `npm warn ERESOLVE overriding peer dependency` and `npm warn deprecated node-domexception@1.0.0: …` before ShipCheck starts. The run works, but new users see these lines first. To investigate: which packages cause them; whether `overrides` in `package.json` removes them (not tested: `overrides` may have no effect for a package installed through `npx`); whether a dependency update removes them; otherwise a sentence in the README quickstart. Done when the command prints no npm warning from an empty folder with an empty cache, checked with the packed file before publishing. No label or milestone on the issue (owner's choice).
-2. **For the release itself:** after `npm publish`, check `npm view @anjalipanwar/shipcheck versions` first (npm may show only a placeholder until the owner approves the staged version); move the `v0` tag to the new release and watch the "Release check" run.
+**Owner's decisions (2026-11-17, on `docs/AUDIT-v0.1.0.md`)**
+
+1. Release 0.1.1 before announcing, with A-01 (server redirects caught by the domain lock; an off-site page never reported as "Home page opens"), A-02, A-03, A-04 (`--max-minutes` a hard stop that still writes a partial report), A-06, A-16, and the guard gaps ("Send", "Log out", icon-only delete buttons blocked; the button's accessible name and icon labels read by the guard).
+2. Strengthen the end-to-end password test so that removing the final scrubbing step makes it fail (A-12).
+3. npm audit: apply the available fix if it is compatible with Stagehand 3.7.x and all tests pass; otherwise record why in the audit and defer to v0.2.
+4. Process for every fix: failing test first (reproducing the audit's evidence), then the fix, then a deliberate break to prove the test catches it. Small commits.
+5. Explain the 9 unpushed leftover commits; delete nothing until the owner says so.
+6. Afterwards: a "Status" column in the audit, checked for details of the owner's real apps, committed; CHANGELOG for 0.1.1; prepare the release like 0.1.0 and stop before `npm publish`; record everything here.
+
+**What was done, and how each fix was proven** (details in each commit message; builder's calls in SPEC §13, 2026-11-17)
+
+| Finding                      | Test that failed first                                                                                                                                            | Deliberate break → caught by                                                                                                                                                                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A-01 redirects               | 5 browser tests (typed address, clicked link, POST 303, two-hop chain, the other site contacted); a command test for an app address that forwards elsewhere       | redirect check removed → 5 tests; forwarding stop removed → 1 command test                                                                                                                                                                                                                    |
+| A-02, A-12 passwords         | an end-to-end test with a fixture page (`/get-login.html`) that repeats the password in its address and its message; unit tests per spelling                      | replacement loop removed → e2e test + 8 unit tests; whole-report scrubbing removed → e2e test; only the typed spelling protected → 3 unit tests; password parameters not hidden → 1 unit test                                                                                                 |
+| A-03 everyday-word passwords | unit tests; command runs with `--password test/mobile/check/desktop/verified`                                                                                     | fixed values scrubbed again → 2 command + 4 unit tests; whole-word rule removed → 1 unit test                                                                                                                                                                                                 |
+| A-04 time limit              | the real command on `/busy.html` (endless script) with `--max-minutes 1`: hung until killed at 180 s                                                              | timer removed → the same 180-second hang, test fails                                                                                                                                                                                                                                          |
+| A-05 guard                   | 39 unit tests and 9 real-browser tests (Lucide/Font Awesome icons, svg title, sprite, data-testid, chat box, email composer, contact form, unlabeled menu button) | ids not judged; icons not judged; plain Send always allowed; log-out wording removed; nameless buttons allowed; inner labels not read; menu buttons not recognised — each fails tests (two breaks first did not apply because of formatting; redone and checked that the file really changed) |
+| A-06 report folder           | command tests for a read-only folder and a file in the way                                                                                                        | check removed → 2 command tests; clean-up removed → 1 command + 1 unit test                                                                                                                                                                                                                   |
+
+- **A-08, npm audit:** `npm audit fix` (no `--force`) moved Stagehand's AI-SDK packages to older versions inside Stagehand 3.7.3's own ranges → 0 vulnerabilities in the lock file; all tests pass; Stagehand starts over CDP and closes with a placeholder key. **Found in the release check:** this reaches the repository, CI and the GitHub Action (it installs with `npm ci`), but not `npx`/`npm install` users — npm ignores a package's lock file, and a published `npm-shrinkwrap.json` did not help either (tested with npm 11.19.1: the user install still got `ai` 5.0.290 with `undici`/`@fastify/busboy`). Recorded in the audit and deferred to v0.2 (owner's rule). By reading the installed code: the vulnerable part only parses multipart form answers, which the AI library never asks for.
+- **A-16:** both warnings come from inside Stagehand 3.7.3; npm reads `overrides` only from the root project, so they cannot be silenced for `npx` users. README note added. The release check showed a third notice with npm 11.19.1 (install scripts it did not run: `@google/genai`, `bufferutil`, `protobufjs`); the note covers it, and the runs below show ShipCheck works without those scripts. Issue #1 stays open for v0.2.
+- **Audit document:** committed with a "Status" column (Fixed in 0.1.1 / Deferred / Won't fix) and a status note at the top. Checked for real-app details: only hosting-platform names (finding A-18), local test addresses, `example.com` and the project's own public links. The machine-name author address quoted in A-23 is now described instead of repeated.
+- **Also changed:** an old test expected a 60 ms limit to still open the home page; with a hard stop it now expects "the time limit was reached before the home page had finished loading" everywhere and no Blocker. "1 minutes" is now "1 minute".
+
+**How it was verified:** typecheck and lint clean; 663 unit tests and 211 real-browser tests pass (one earlier full run showed 9 failures with test times of 760–3,480 s — the computer had slept; the rerun passed). Release check exactly like 0.1.0: `npm pack` → 7 files, 256.5 kB, no path of this computer in `dist/`; installed into an empty folder with an empty npm cache; from there: `--version` → 0.1.1, `--help`, no key → exit 2 with the how-to, automatic checks on the fixture → exit 1 with the same counts as 0.1.0 (1 Blocker, 1 Major, 6 Minor, 1 Info) and a report with screenshots; and the fixes: an address that forwards to another site → exit 2, plain message, no report, the other site received nothing; `--password test` → full report; `/busy.html` with `--max-minutes 1` → stopped after 61 s with a partial report; `--out` pointing at a file → exit 2 with a plain message.
+
+**Not verified:** a real model call with the changed AI-SDK packages (needs a real key and the owner's approval; `npm run test:ai` on the fixture would cover it). CI on GitHub (needs a push). The published package (after the owner's `npm publish`).
+
+**Seen, not changed:** a run stopped by the time limit exits with the code its findings give — for the busy page that is 0, although almost nothing was tested. Every partial run has worked this way since 0.1.0 (exit codes follow `--fail-on`); the report and the summary say "partial". Worth a decision for v0.2.
+
+**The 9 unpushed leftover commits (explained to the owner; nothing deleted)**
+
+They are "dangling" commit objects: stored only in this computer's `.git` folder, reachable from no branch or tag, and never pushed (GitHub only receives commits a branch or tag points to). 3 are dropped `git stash` entries ("WIP on main…": `6f781be`, `9612f7f`, `6a4306d`). 6 are older versions of commits that were later replaced with `--amend` or by rebasing onto the GitHub commit: `74f8c90` (→ `38c5fec`), `0bfa54f` and `68e2eb6` (→ `dd2e9c1`), `9ccb5e8` (→ `9b76c8c`), `688ceaa` (→ `2d605ba`), `d0b60ee` (→ the amended log-in commit). None contains a key, and no address or email beyond what is already in the pushed history. They are harmless, and git removes them by itself (`git gc`, after the reflog and prune periods). Deleting them now would be `git reflog expire --expire-unreachable=now --all && git gc --prune=now` — only if the owner says so.
+
+**Open, with the owner**
+
+1. Push the 0.1.1 commits to `main` (and then watch CI)? A push may be refused by GitHub's email privacy setting, as before.
+2. Approve one real-key run on the fixture (`npm run test:ai`) to check the changed AI-SDK packages with a real model before publishing?
+3. Publish: `npm publish` from a clean checkout of the release commit (`prepack` builds), then `npm view @anjalipanwar/shipcheck versions` first (staged publishing), then the empty-folder check with the real `npx` command, then set `v0.1.1` and move `v0`, and watch the "Release check" run.
+4. GitHub release for `v0.1.1` with the CHANGELOG section (owner's step).
+5. Deferred items for v0.2 are listed in the audit's Status column (among them: A-08 for `npx` users, removing the npm warnings, the backstop part of A-05, A-07, A-09, A-10, A-11).
 
 ---
 
